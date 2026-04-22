@@ -10,6 +10,19 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Badge } from '@/components/ui/Badge';
 import { AlertService } from '@/services/alert.service';
+import Map from '@/components/Map';
+
+const parseLocation = (locStr: string | null) => {
+    if (!locStr) return null;
+    const match = locStr.match(/POINT\(([^ ]+) ([^ ]+)\)/);
+    if (match) {
+        return {
+            lng: parseFloat(match[1]),
+            lat: parseFloat(match[2])
+        };
+    }
+    return null;
+};
 
 interface BloodRequest {
     id: number;
@@ -313,6 +326,16 @@ export default function RequestDetailPage() {
                                         <div className="inline-flex items-center gap-1.5 bg-zinc-100 dark:bg-white/5 px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-600 dark:text-zinc-300">
                                             <Clock className="w-3.5 h-3.5" /> Posted {new Date(request.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </div>
+                                        {(request as any).location && (request as any).location !== 'POINT(0 0)' && (
+                                            <a 
+                                                href={`https://www.google.com/maps/dir/?api=1&destination=${parseLocation((request as any).location)!.lat},${parseLocation((request as any).location)!.lng}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1.5 bg-zinc-900 dark:bg-white px-3 py-1.5 rounded-lg text-xs font-bold text-white dark:text-zinc-900 hover:scale-105 transition-transform shadow-sm"
+                                            >
+                                                <Share2 className="w-3.5 h-3.5 rotate-90" /> Get Directions
+                                            </a>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -348,6 +371,24 @@ export default function RequestDetailPage() {
                             </div>
                         </div>
                     </div>
+
+                    {/* Map Preview */}
+                    {(request as any).location && (request as any).location !== 'POINT(0 0)' && (
+                        <div className="h-64 sm:h-80 w-full rounded-[2rem] overflow-hidden border border-zinc-200/50 dark:border-white/10 shadow-sm">
+                            <Map 
+                                center={[parseLocation((request as any).location)!.lng, parseLocation((request as any).location)!.lat]}
+                                zoom={14}
+                                markers={[{
+                                    id: 'hospital',
+                                    lat: parseLocation((request as any).location)!.lat,
+                                    lng: parseLocation((request as any).location)!.lng,
+                                    label: request.hospital_name,
+                                    type: 'hospital'
+                                }]}
+                                className="h-full w-full"
+                            />
+                        </div>
+                    )}
 
                     {/* Real-time Responses Block */}
                     {acceptedDonors.length > 0 && (

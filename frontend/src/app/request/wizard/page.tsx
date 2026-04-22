@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { supabaseClient as supabase } from '@/lib/supabase/client';
 import { DonorService } from '@/services/donor.service';
+import Map from '@/components/Map';
 
 const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const;
 
@@ -445,6 +446,23 @@ export default function RequestWizardPage() {
                                                     <span className="font-bold text-zinc-900 dark:text-white">{formData.contact_phone}</span>
                                                 </div>
                                             </div>
+
+                                            {gpsLocation && (
+                                                <div className="h-40 w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-sm">
+                                                    <Map 
+                                                        center={[gpsLocation.lng, gpsLocation.lat]}
+                                                        zoom={15}
+                                                        markers={[{
+                                                            id: 'hospital',
+                                                            lat: gpsLocation.lat,
+                                                            lng: gpsLocation.lng,
+                                                            label: formData.hospital_name || 'Hospital Location',
+                                                            type: 'hospital'
+                                                        }]}
+                                                        className="h-full w-full"
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 

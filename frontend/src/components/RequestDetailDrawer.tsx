@@ -13,6 +13,19 @@ import { RequestService } from "@/services/request.service";
 import { AlertService } from "@/services/alert.service";
 import type { BloodRequest } from "@/types";
 import Link from "next/link";
+import Map from "@/components/Map";
+
+const parseLocation = (locStr: string | null) => {
+    if (!locStr) return null;
+    const match = locStr.match(/POINT\(([^ ]+) ([^ ]+)\)/);
+    if (match) {
+        return {
+            lng: parseFloat(match[1]),
+            lat: parseFloat(match[2])
+        };
+    }
+    return null;
+};
 
 const URGENCY_COLOR: Record<string, string> = {
     IMMEDIATE: "bg-rose-500 text-white border-rose-500",
@@ -265,6 +278,16 @@ export function RequestDetailDrawer({ requestId, onClose, onActionComplete }: Pr
                                                 <div className="inline-flex items-center gap-1.5 bg-zinc-100 dark:bg-white/5 px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-600 dark:text-zinc-300">
                                                     <Clock className="w-3.5 h-3.5" /> {new Date(request.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                                 </div>
+                                                {request.location && request.location !== 'POINT(0 0)' && (
+                                                    <a 
+                                                        href={`https://www.google.com/maps/dir/?api=1&destination=${parseLocation(request.location)!.lat},${parseLocation(request.location)!.lng}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1.5 bg-zinc-900 dark:bg-white px-3 py-1.5 rounded-lg text-xs font-bold text-white dark:text-zinc-900 hover:scale-105 transition-transform"
+                                                    >
+                                                        <Share2 className="w-3.5 h-3.5 rotate-90" /> Directions
+                                                    </a>
+                                                )}
                                             </div>
 
                                             <div className="border-t border-zinc-200/50 dark:border-white/10 pt-5 space-y-4">
@@ -302,6 +325,24 @@ export function RequestDetailDrawer({ requestId, onClose, onActionComplete }: Pr
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Map Preview */}
+                                    {request.location && request.location !== 'POINT(0 0)' && (
+                                        <div className="h-48 w-full rounded-[2rem] overflow-hidden border border-zinc-200/50 dark:border-white/10 shadow-sm">
+                                            <Map 
+                                                center={[parseLocation(request.location)!.lng, parseLocation(request.location)!.lat]}
+                                                zoom={14}
+                                                markers={[{
+                                                    id: 'hospital',
+                                                    lat: parseLocation(request.location)!.lat,
+                                                    lng: parseLocation(request.location)!.lng,
+                                                    label: request.hospital_name,
+                                                    type: 'hospital'
+                                                }]}
+                                                className="h-full w-full"
+                                            />
+                                        </div>
+                                    )}
 
                                     {/* Donor Responses */}
                                     {acceptedDonors.length > 0 && (
