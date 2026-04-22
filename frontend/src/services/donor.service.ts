@@ -61,8 +61,7 @@ export class DonorService {
   static async updateProfile(userId: string, profileData: ProfileUpdate) {
     const { data, error } = await (supabaseClient as any)
       .from('profiles')
-      .update(profileData)
-      .eq('id', userId)
+      .upsert({ id: userId, ...profileData })
       .select()
       .single()
 

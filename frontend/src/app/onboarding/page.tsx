@@ -24,8 +24,8 @@ export default function OnboardingPage() {
 
     const [formData, setFormData] = useState({
         blood_group: '',
-        phone_number: '',
-        city: '',
+        phone: '',
+        location: '',
         is_available_donor: true,
     });
 
@@ -127,10 +127,10 @@ export default function OnboardingPage() {
                                                 pattern="[0-9]{10}"
                                                 className="pl-12 h-14 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-800 rounded-xl font-medium"
                                                 placeholder="10-digit number"
-                                                value={formData.phone_number}
+                                                value={formData.phone}
                                                 onChange={(e) => {
                                                     const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                                                    setFormData({ ...formData, phone_number: val });
+                                                    setFormData({ ...formData, phone: val });
                                                 }}
                                             />
                                         </div>
@@ -147,8 +147,8 @@ export default function OnboardingPage() {
                                                 minLength={3}
                                                 className="pl-12 h-14 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-800 rounded-xl font-medium"
                                                 placeholder="e.g. Bangalore"
-                                                value={formData.city}
-                                                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                                value={formData.location}
+                                                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                                             />
                                         </div>
                                     </div>
@@ -182,7 +182,7 @@ export default function OnboardingPage() {
                                 <div className="pt-4 space-y-6">
                                     <button
                                         type="submit"
-                                        disabled={loading || !formData.blood_group || !formData.phone_number || !formData.city}
+                                        disabled={loading || !formData.blood_group || !formData.phone || !formData.location}
                                         className="w-full h-14 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold rounded-xl flex items-center justify-center shadow-md disabled:opacity-50 transition-all hover:scale-[1.02] active:scale-[0.98]"
                                     >
                                         {loading ? (
