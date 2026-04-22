@@ -16,6 +16,7 @@ import { AlertService } from '@/services/alert.service';
 import { Button } from "@/components/ui/Button";
 import { DonorAvailabilityToggle } from "@/components/DonorAvailabilityToggle";
 import { NotificationBell } from "@/components/NotificationBell";
+import { RequestDetailDrawer } from "@/components/RequestDetailDrawer";
 import type { BloodRequest, User } from "@/types";
 
 type Tab = "donate" | "mine";
@@ -58,6 +59,7 @@ export default function DashboardPage() {
     const [tab, setTab] = useState<Tab>("donate");
     const [acceptingId, setAcceptingId] = useState<number | string | null>(null);
     const [acceptedIds, setAcceptedIds] = useState<Set<number | string>>(new Set());
+    const [selectedRequestId, setSelectedRequestId] = useState<string | number | null>(null);
 
     const fetchData = useCallback(async () => {
         if (!user?.id) return;
@@ -316,8 +318,8 @@ export default function DashboardPage() {
                                 ) : (
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                         {donateRequests.map((req, i) => (
-                                            <motion.div key={req.id} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }} className="group relative">
-                                                <div className="absolute inset-0 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200/50 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] pointer-events-none" />
+                                            <motion.div key={req.id} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }} className="group relative cursor-pointer" onClick={() => setSelectedRequestId(req.id)}>
+                                                <div className="absolute inset-0 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200/50 dark:border-white/10 group-hover:border-crimson/30 transition-colors shadow-[0_8px_30px_rgb(0,0,0,0.04)] pointer-events-none" />
                                                 <div className="relative p-6 flex flex-col h-full">
                                                     
                                                     {/* Header Status Phase */}
@@ -405,8 +407,8 @@ export default function DashboardPage() {
                                             const statusLabel = STATUS_LABEL[req.status] ?? "Unknown status";
                                             
                                             return (
-                                            <motion.div key={req.id} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }}>
-                                                <Link href={`/request/${req.id}`} className="block relative group outline-none">
+                                            <motion.div key={req.id} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }} className="cursor-pointer" onClick={() => setSelectedRequestId(req.id)}>
+                                                <div className="relative group outline-none">
                                                     <div className="absolute inset-0 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200/50 dark:border-white/10 group-hover:border-crimson/30 transition-colors shadow-[0_8px_30px_rgb(0,0,0,0.04)] pointer-events-none" />
                                                     <div className="relative p-6">
                                                         
@@ -433,14 +435,11 @@ export default function DashboardPage() {
                                                             <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-white/5">
                                                                 <p className="text-xs font-bold text-zinc-500 mb-2 uppercase tracking-wider">Donor Found</p>
                                                                 <p className="text-sm font-semibold text-zinc-900 dark:text-white mb-1">{req.donor_name}</p>
-                                                                <a href={`tel:${req.donor_phone}`} className="inline-block px-4 py-2 bg-zinc-100 dark:bg-white/10 rounded-lg text-sm font-bold text-zinc-900 dark:text-white hover:bg-zinc-200 transition-colors">
-                                                                    Call Donor
-                                                                </a>
                                                             </div>
                                                         )}
 
                                                     </div>
-                                                </Link>
+                                                </div>
                                             </motion.div>
                                         )})}
                                     </div>
@@ -450,6 +449,13 @@ export default function DashboardPage() {
                     </AnimatePresence>
                 </motion.div>
             </main>
+
+            {/* Request Detail Drawer */}
+            <RequestDetailDrawer
+                requestId={selectedRequestId}
+                onClose={() => setSelectedRequestId(null)}
+                onActionComplete={() => { fetchData(); setSelectedRequestId(null); }}
+            />
         </div>
     );
 }
