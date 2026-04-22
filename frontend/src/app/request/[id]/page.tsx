@@ -71,6 +71,7 @@ export default function RequestDetailPage() {
 
     const [request, setRequest] = useState<BloodRequest | null>(null);
     const [donors, setDonors] = useState<MatchingDonor[]>([]);
+    const [acceptedDonors, setAcceptedDonors] = useState<any[]>([]);
     const [bloodBanks, setBloodBanks] = useState<BloodBank[]>([]);
     const [loading, setLoading] = useState(true);
     const [accepting, setAccepting] = useState(false);
@@ -125,6 +126,14 @@ export default function RequestDetailPage() {
                         console.error('Error fetching nearby donors:', e);
                     }
                 }
+                
+                // Fetch donor responses for this request
+                try {
+                    const responses = await DonorService.getResponsesForRequest(params.id as string);
+                    setAcceptedDonors(responses);
+                } catch (e) {
+                    console.error('Error fetching donor responses:', e);
+                }
             } catch (err: any) {
                 console.error('Error fetching request:', err);
                 setError(err.response?.status === 404 ? 'Request not found' : 'Failed to load request');
@@ -147,15 +156,22 @@ export default function RequestDetailPage() {
     }, [params.id, api, user]);
 
     const handleAcceptRequest = async () => {
+        if (!currentUserProfile?.id) {
+            alert('Please complete your profile to donate.');
+            return;
+        }
+        
         setAccepting(true);
         try {
-            await api.post(`requests/${params.id}/accept/`);
-            // Optimistically update ui or reload
-            const response = await api.get(`requests/${params.id}/`);
-            setRequest(response.data);
-            alert('Thank you! The requester has been notified.');
+            await DonorService.submitDonorResponse(params.id as string, currentUserProfile.id.toString());
+            
+            // Fetch updated responses
+            const responses = await DonorService.getResponsesForRequest(params.id as string);
+            setAcceptedDonors(responses);
+            
+            alert('Thank you! You are now responding to this request.');
         } catch (error: any) {
-            alert(error.response?.data?.error || 'Failed to accept request');
+            alert(error.message || 'Failed to accept request');
         } finally {
             setAccepting(false);
         }
@@ -313,15 +329,25 @@ export default function RequestDetailPage() {
                                     )}
                                 </>
                             ) : (
-                                request.status === 'CREATED' && (
-                                    <Button
-                                        onClick={handleAcceptRequest}
-                                        disabled={accepting}
-                                        size="lg"
-                                        className="w-full text-lg h-14 shadow-xl hover:shadow-2xl bg-gradient-to-r from-red-600 to-brand-red border-none"
-                                    >
-                                        <Heart className={`w-6 h-6 mr-2 ${accepting ? 'animate-pulse' : ''}`} /> {accepting ? 'Processing...' : 'I Can Donate'}
-                                    </Button>
+                                (request.status === 'CREATED' || request.status === 'SEARCHING_FOR_DONORS') && (
+                                    !acceptedDonors.some(d => d.donor_id === currentUserProfile?.id) ? (
+                                        <Button
+                                            onClick={handleAcceptRequest}
+                                            disabled={accepting}
+                                            size="lg"
+                                            className="w-full text-lg h-14 shadow-xl hover:shadow-2xl bg-gradient-to-r from-red-600 to-brand-red border-none"
+                                        >
+                                            <Heart className={`w-6 h-6 mr-2 ${accepting ? 'animate-pulse' : ''}`} /> {accepting ? 'Processing...' : 'I Can Donate'}
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            disabled
+                                            size="lg"
+                                            className="w-full text-lg h-14 bg-green-100 text-green-700 border-green-200"
+                                        >
+                                            <CheckCircle className="w-6 h-6 mr-2" /> You are responding
+                                        </Button>
+                                    )
                                 )
                             )}
                             <Button variant="outline" size="lg" className="w-full text-gray-600 border-gray-200" onClick={() => navigator.share?.({ title: 'Blood Request', url: window.location.href })}>
@@ -332,43 +358,47 @@ export default function RequestDetailPage() {
 
                     {/* Sidebar */}
                     <div className="space-y-6">
-                        {request.assigned_donor ? (
+                        {acceptedDonors.length > 0 && (
                             <Card className="border-green-200 bg-green-50">
-                                <CardContent className="p-6 text-center">
-                                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600">
-                                        <CheckCircle className="w-8 h-8" />
-                                    </div>
-                                    <h3 className="text-lg font-bold text-green-900">Donor Assigned</h3>
-                                    <p className="text-green-700 mb-4">{request.assigned_donor.first_name} is on their way!</p>
-
-                                    {isRequester ? (
-                                        request.assigned_donor.phone_number ? (
-                                            <a href={`tel:${request.assigned_donor.phone_number}`} className="w-full">
-                                                <Button className="w-full bg-green-600 hover:bg-green-700 text-white shadow-md">
-                                                    <Phone className="w-4 h-4 mr-2" /> Call {request.assigned_donor.first_name}
-                                                </Button>
-                                            </a>
-                                        ) : (
-                                            <Button disabled variant="outline" className="w-full bg-white border-green-200 text-green-700">Contact Donor</Button>
-                                        )
-                                    ) : (
-                                        currentUserProfile?.id === request.assigned_donor.id && (
-                                            <div className="space-y-4">
-                                                <div className="bg-white/50 p-3 rounded-lg border border-green-100">
-                                                    <p className="text-xs text-green-600 font-bold uppercase mb-1">Requester Contact</p>
-                                                    <p className="font-bold text-gray-900">{request.contact_phone}</p>
+                                <CardHeader>
+                                    <CardTitle className="text-lg flex items-center gap-2 text-green-900">
+                                        <CheckCircle className="w-5 h-5" /> Donors Responding ({acceptedDonors.length})
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-0">
+                                    <div className="divide-y divide-green-100">
+                                        {acceptedDonors.map((response) => (
+                                            <div key={response.id} className="p-4 hover:bg-green-100/50 transition-colors">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <p className="font-bold text-gray-900">{response.profiles.full_name}</p>
+                                                    <Badge variant="outline" className="bg-white text-green-700 border-green-200 text-[10px]">
+                                                        {response.status}
+                                                    </Badge>
                                                 </div>
-                                                <a href={`tel:${request.contact_phone}`} className="w-full block">
-                                                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white shadow-md">
-                                                        <Phone className="w-4 h-4 mr-2" /> Call Requester
-                                                    </Button>
-                                                </a>
+                                                {isRequester ? (
+                                                    <a href={`tel:${response.profiles.phone}`} className="w-full">
+                                                        <Button size="sm" className="w-full bg-green-600 hover:bg-green-700 text-white shadow-md">
+                                                            <Phone className="w-4 h-4 mr-2" /> Call Donor
+                                                        </Button>
+                                                    </a>
+                                                ) : currentUserProfile?.id === response.donor_id ? (
+                                                    <div className="space-y-2">
+                                                        <p className="text-xs text-green-700">You have offered to help!</p>
+                                                        <a href={`tel:${request.contact_phone}`} className="w-full block">
+                                                            <Button size="sm" variant="outline" className="w-full border-green-600 text-green-700 hover:bg-green-50">
+                                                                <Phone className="w-4 h-4 mr-2" /> Call Requester
+                                                            </Button>
+                                                        </a>
+                                                    </div>
+                                                ) : null}
                                             </div>
-                                        )
-                                    )}
+                                        ))}
+                                    </div>
                                 </CardContent>
                             </Card>
-                        ) : (
+                        )}
+                        
+                        {(!isRequester || acceptedDonors.length === 0) && (
                             isRequester && (
                                 <Card className="border-gray-200 shadow-sm">
                                     <CardHeader>

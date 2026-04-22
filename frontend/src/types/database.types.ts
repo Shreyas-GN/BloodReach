@@ -91,6 +91,29 @@ export interface Database {
           donor_phone?: string | null
         }
       }
+      donor_responses: {
+        Row: {
+          id: string
+          request_id: string
+          donor_id: string
+          status: 'ACCEPTED' | 'CONFIRMED' | 'ARRIVED' | 'CANCELLED'
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          request_id: string
+          donor_id: string
+          status?: 'ACCEPTED' | 'CONFIRMED' | 'ARRIVED' | 'CANCELLED'
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          request_id?: string
+          donor_id?: string
+          status?: 'ACCEPTED' | 'CONFIRMED' | 'ARRIVED' | 'CANCELLED'
+          created_at?: string
+        }
+      }
     }
     Functions: {
       find_nearby_donors: {

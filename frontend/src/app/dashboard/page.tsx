@@ -66,6 +66,16 @@ export default function DashboardPage() {
             ]);
             setProfile(profileData as any);
             setAllRequests(requestsData as any);
+            
+            if (profileData) {
+                // Fetch responses for this donor to populate acceptedIds
+                try {
+                    const data = await DonorService.getResponsesForDonor(profileData.id);
+                    setAcceptedIds(new Set(data.map((r: any) => r.request_id)));
+                } catch {
+                    // Ignore
+                }
+            }
         } catch {
             // Logged silently
         } finally {
@@ -82,11 +92,7 @@ export default function DashboardPage() {
     const handleAccept = async (requestId: any) => {
         setAcceptingId(requestId);
         try {
-            await RequestService.updateRequest(requestId, { 
-                status: 'DONOR_ACCEPTED',
-                donor_name: profile?.full_name || user?.firstName || 'A generous donor',
-                donor_phone: profile?.phone || ''
-            });
+            await DonorService.submitDonorResponse(requestId.toString(), profile!.id.toString());
             setAcceptedIds((prev) => new Set(prev).add(requestId));
             await fetchData();
         } catch (err: any) {
@@ -114,7 +120,7 @@ export default function DashboardPage() {
         (r) =>
             r.requester_id !== (profile?.id ?? -1) &&
             r.blood_group === profile?.blood_group &&
-            ((r.status === "SEARCHING_FOR_DONORS" || r.status === "CREATED" || r.status === "open") || (r.status === "DONOR_ACCEPTED" && r.donor_phone === profile?.phone))
+            (r.status === "SEARCHING_FOR_DONORS" || r.status === "CREATED" || r.status === "open" || acceptedIds.has(r.id))
     );
 
     const displayName = user?.firstName ?? user?.username ?? "There";
@@ -335,7 +341,7 @@ export default function DashboardPage() {
                                                     </div>
 
                                                     {/* Execution Engine */}
-                                                    {req.status === 'DONOR_ACCEPTED' && req.donor_phone === profile?.phone ? (
+                                                    {acceptedIds.has(req.id) ? (
                                                         <div className="w-full bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl">
                                                             <p className="text-sm font-bold text-emerald-800 dark:text-emerald-400 mb-1">You are helping {req.patient_name}!</p>
                                                             <p className="text-xs text-emerald-700 dark:text-emerald-500 mb-3">Please call the patient's contact right away to coordinate the donation.</p>
@@ -348,18 +354,10 @@ export default function DashboardPage() {
                                                         whileHover={{ scale: 0.98 }}
                                                         whileTap={{ scale: 0.95 }}
                                                         onClick={() => handleAccept(req.id)}
-                                                        disabled={acceptingId === req.id || acceptedIds.has(req.id)}
-                                                        className={`w-full py-3.5 rounded-2xl font-bold text-sm tracking-tight flex items-center justify-center gap-2 transition-all ${
-                                                            acceptedIds.has(req.id)
-                                                                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 cursor-not-allowed border border-emerald-500/20"
-                                                                : "bg-zinc-900 dark:bg-white text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 shadow-[0_4px_14px_0_rgba(0,0,0,0.1)] dark:shadow-[0_4px_14px_0_rgba(255,255,255,0.05)]"
-                                                        } disabled:opacity-50`}
+                                                        disabled={acceptingId === req.id}
+                                                        className="w-full py-3.5 rounded-2xl font-bold text-sm tracking-tight flex items-center justify-center gap-2 transition-all bg-zinc-900 dark:bg-white text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 shadow-[0_4px_14px_0_rgba(0,0,0,0.1)] dark:shadow-[0_4px_14px_0_rgba(255,255,255,0.05)] disabled:opacity-50"
                                                     >
-                                                        {acceptedIds.has(req.id) ? (
-                                                            <>
-                                                                <CheckCircle2 className="w-4 h-4" /> You're helping
-                                                            </>
-                                                        ) : acceptingId === req.id ? (
+                                                        {acceptingId === req.id ? (
                                                             <>
                                                                 <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
                                                                 Confirming...

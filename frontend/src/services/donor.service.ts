@@ -71,4 +71,60 @@ export class DonorService {
     
     return data
   }
+
+  /**
+   * Submits a donor response to a blood request
+   */
+  static async submitDonorResponse(requestId: string, donorId: string, status: 'ACCEPTED' | 'CONFIRMED' | 'ARRIVED' | 'CANCELLED' = 'ACCEPTED') {
+    const { data, error } = await (supabaseClient as any)
+      .from('donor_responses')
+      .upsert({ 
+        request_id: requestId, 
+        donor_id: donorId,
+        status: status 
+      }, { onConflict: 'request_id,donor_id' })
+      .select()
+      .single()
+
+    if (error) {
+       throw new Error(`Failed to submit donor response: ${error.message}`)
+    }
+    
+    return data
+  }
+
+  /**
+   * Gets all donor responses for a specific request
+   */
+  static async getResponsesForRequest(requestId: string) {
+    const { data, error } = await (supabaseClient as any)
+      .from('donor_responses')
+      .select(`
+        *,
+        profiles!inner(*)
+      `)
+      .eq('request_id', requestId)
+
+    if (error) {
+       throw new Error(`Failed to fetch donor responses: ${error.message}`)
+    }
+    
+    return data
+  }
+
+  /**
+   * Gets all donor responses for a specific donor
+   */
+  static async getResponsesForDonor(donorId: string) {
+    const { data, error } = await (supabaseClient as any)
+      .from('donor_responses')
+      .select('request_id, status')
+      .eq('donor_id', donorId)
+
+    if (error) {
+       throw new Error(`Failed to fetch donor responses: ${error.message}`)
+    }
+    
+    return data
+  }
 }
