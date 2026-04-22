@@ -448,19 +448,22 @@ export default function RequestWizardPage() {
                                             </div>
 
                                             {gpsLocation && (
-                                                <div className="h-40 w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-sm">
-                                                    <Map 
-                                                        center={[gpsLocation.lng, gpsLocation.lat]}
-                                                        zoom={15}
-                                                        markers={[{
-                                                            id: 'hospital',
-                                                            lat: gpsLocation.lat,
-                                                            lng: gpsLocation.lng,
-                                                            label: formData.hospital_name || 'Hospital Location',
-                                                            type: 'hospital'
-                                                        }]}
-                                                        className="h-full w-full"
-                                                    />
+                                                <div className="space-y-3">
+                                                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-1">Hospital Location</p>
+                                                    <div className="h-40 w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-sm">
+                                                        <Map 
+                                                            center={[gpsLocation.lng, gpsLocation.lat]}
+                                                            zoom={15}
+                                                            markers={[{
+                                                                id: 'hospital',
+                                                                lat: gpsLocation.lat,
+                                                                lng: gpsLocation.lng,
+                                                                label: formData.hospital_name || 'Hospital Location',
+                                                                type: 'hospital'
+                                                            }]}
+                                                            className="h-full w-full"
+                                                        />
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>

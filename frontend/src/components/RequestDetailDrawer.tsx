@@ -240,6 +240,22 @@ export function RequestDetailDrawer({ requestId, onClose, onActionComplete }: Pr
                                         </div>
                                     )}
 
+                                    {/* Quick Actions */}
+                                    {!isClosed && (
+                                        <div className="flex gap-2">
+                                            <a href={`tel:${request.contact_phone}`} className="flex-1">
+                                                <button className="w-full py-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold rounded-2xl flex items-center justify-center gap-2 text-sm shadow-md transition-all hover:scale-[1.02] active:scale-[0.98]">
+                                                    <Phone className="w-4 h-4" /> Call Contact
+                                                </button>
+                                            </a>
+                                            <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(request.hospital_name + " " + request.city)}`} target="_blank" rel="noopener noreferrer" className="flex-1">
+                                                <button className="w-full py-3 bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white font-bold rounded-2xl flex items-center justify-center gap-2 text-sm transition-all hover:bg-zinc-50 dark:hover:bg-white/10">
+                                                    <MapPin className="w-4 h-4" /> Directions
+                                                </button>
+                                            </a>
+                                        </div>
+                                    )}
+
                                     {/* Case File Card */}
                                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-white/10 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden relative">
                                         {isClosed && (
@@ -328,7 +344,9 @@ export function RequestDetailDrawer({ requestId, onClose, onActionComplete }: Pr
 
                                     {/* Map Preview */}
                                     {request.location && request.location !== 'POINT(0 0)' && (
-                                        <div className="h-48 w-full rounded-[2rem] overflow-hidden border border-zinc-200/50 dark:border-white/10 shadow-sm">
+                                        <div className="space-y-3">
+                                            <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest px-1">Hospital Location</p>
+                                            <div className="h-48 w-full rounded-[2rem] overflow-hidden border border-zinc-200/50 dark:border-white/10 shadow-sm">
                                             <Map 
                                                 center={[parseLocation(request.location)!.lng, parseLocation(request.location)!.lat]}
                                                 zoom={14}
@@ -342,6 +360,7 @@ export function RequestDetailDrawer({ requestId, onClose, onActionComplete }: Pr
                                                 className="h-full w-full"
                                             />
                                         </div>
+                                    </div>
                                     )}
 
                                     {/* Donor Responses */}

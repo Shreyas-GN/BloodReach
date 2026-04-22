@@ -155,7 +155,17 @@ export default function DashboardPage() {
                         <span className="text-[17px] font-bold tracking-tight">PulseAid</span>
                     </Link>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
+                        <Link href="/request/wizard">
+                            <motion.span
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.97 }}
+                                className="flex items-center gap-1.5 px-3 py-2 bg-crimson text-white text-xs font-bold rounded-xl shadow-[0_4px_14px_rgba(192,57,43,0.3)] transition-all cursor-pointer"
+                            >
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                Emergency
+                            </motion.span>
+                        </Link>
                         <NotificationBell />
                         <Link href="/settings">
                             <motion.button 
@@ -170,94 +180,63 @@ export default function DashboardPage() {
                 </nav>
             </header>
 
-            <main className="max-w-7xl mx-auto px-6 py-10 space-y-12">
-                
-                {/* Hero / Pulse Identity */}
+            <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+
+                {/* Identity Strip */}
                 <motion.div
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-zinc-200/50 dark:border-white/10 pb-8"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-zinc-200/50 dark:border-white/10"
                 >
-                    <div className="space-y-2">
-                        <h1 className="text-4xl font-extrabold tracking-tighter text-zinc-900 dark:text-white">
-                            Good morning, {displayName}.
-                        </h1>
-                        <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                            Here's what's happening near you.
-                        </p>
-                    </div>
-                    <Link href="/request/wizard">
-                        <motion.button 
-                            whileHover={{ scale: 0.98 }}
-                            whileTap={{ scale: 0.95 }}
-                            className="flex items-center gap-2 bg-crimson hover:bg-red-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-[0_4px_14px_0_rgba(192,57,43,0.3)] transition-all"
-                        >
-                            <AlertCircle className="w-4 h-4" />
-                            Request blood for someone
-                        </motion.button>
-                    </Link>
-                </motion.div>
-
-                {/* Data Telemetry Grid (Bento) -> Situational Stats Grid */}
-                <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
-                >
-                    <div className="bg-white dark:bg-white/5 border border-zinc-200/50 dark:border-white/10 rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-                        <div className="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center mb-4">
-                            <Droplet className="w-5 h-5 text-crimson" />
-                        </div>
-                        <p className="text-3xl font-extrabold tracking-tight font-mono text-zinc-900 dark:text-white mb-1">
-                            {profile?.blood_group ?? "Not set"}
-                        </p>
-                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Your blood group</p>
-                    </div>
-
-                    <div className="bg-white dark:bg-white/5 border border-zinc-200/50 dark:border-white/10 rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-4 ${profile?.is_available_donor ? 'bg-emerald-500/10' : 'bg-zinc-500/10'}`}>
-                            <Heart className={`w-5 h-5 ${profile?.is_available_donor ? 'text-emerald-600' : 'text-zinc-500'}`} />
-                        </div>
-                        <p className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white mb-1">
-                            {profile?.is_available_donor ? "Available to help" : "Not available right now"}
-                        </p>
-                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Status</p>
-                    </div>
-
-                    <div className="bg-white dark:bg-white/5 border border-zinc-200/50 dark:border-white/10 rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
-                        {donateRequests.length > 0 && (
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-3xl rounded-full" />
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <span className="font-extrabold text-zinc-900 dark:text-white text-lg tracking-tight">{displayName}</span>
+                        {profile?.blood_group && (
+                            <span className="px-2.5 py-1 bg-rose-500/10 text-crimson font-mono font-bold text-sm rounded-lg border border-rose-500/20">
+                                {profile.blood_group}
+                            </span>
                         )}
-                        <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center mb-4">
-                            <Zap className="w-5 h-5 text-amber-600" />
-                        </div>
-                        <p className="text-3xl font-extrabold tracking-tight font-mono text-zinc-900 dark:text-white mb-1">
-                            {donateRequests.length}
-                        </p>
-                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Requests near you</p>
+                        <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                            profile?.is_available_donor
+                                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
+                                : 'bg-zinc-100 dark:bg-white/5 text-zinc-500 border-zinc-200/50 dark:border-white/10'
+                        }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${profile?.is_available_donor ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'}`} />
+                            {profile?.is_available_donor ? 'Available' : 'Unavailable'}
+                        </span>
                     </div>
-
-                    <div className="bg-white dark:bg-white/5 border border-zinc-200/50 dark:border-white/10 rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-                        <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
-                            <TrendingUp className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <p className="text-3xl font-extrabold tracking-tight font-mono text-zinc-900 dark:text-white mb-1">
-                            {myRequests.length}
-                        </p>
-                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Requests you made</p>
-                    </div>
-                </motion.div>
-
-                {/* Router Toggle */}
-                {profile && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
+                    {profile && (
                         <DonorAvailabilityToggle
                             initialAvailable={profile.is_available_donor ?? false}
                             onToggle={() => fetchData()}
                         />
-                    </motion.div>
-                )}
+                    )}
+                </motion.div>
+
+                {/* Stats — 2 actionable counts only */}
+                <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.08 }}
+                    className="grid grid-cols-2 gap-4"
+                >
+                    <div className="bg-white dark:bg-white/5 border border-zinc-200/50 dark:border-white/10 rounded-2xl p-6 shadow-[0_4px_20px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                        {donateRequests.length > 0 && (
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 blur-2xl rounded-full pointer-events-none" />
+                        )}
+                        <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Active near you</p>
+                        <p className="text-4xl font-extrabold tracking-tight font-mono text-zinc-900 dark:text-white">
+                            {donateRequests.length}
+                        </p>
+                        <p className="text-xs text-zinc-500 font-medium mt-1">matching requests</p>
+                    </div>
+                    <div className="bg-white dark:bg-white/5 border border-zinc-200/50 dark:border-white/10 rounded-2xl p-6 shadow-[0_4px_20px_rgb(0,0,0,0.04)]">
+                        <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Your requests</p>
+                        <p className="text-4xl font-extrabold tracking-tight font-mono text-zinc-900 dark:text-white">
+                            {myRequests.length}
+                        </p>
+                        <p className="text-xs text-zinc-500 font-medium mt-1">total submitted</p>
+                    </div>
+                </motion.div>
 
                 {/* Data Views */}
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="space-y-6">

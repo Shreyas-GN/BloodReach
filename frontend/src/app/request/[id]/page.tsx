@@ -374,7 +374,9 @@ export default function RequestDetailPage() {
 
                     {/* Map Preview */}
                     {(request as any).location && (request as any).location !== 'POINT(0 0)' && (
-                        <div className="h-64 sm:h-80 w-full rounded-[2rem] overflow-hidden border border-zinc-200/50 dark:border-white/10 shadow-sm">
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest px-2">Hospital Location</h3>
+                            <div className="h-64 sm:h-80 w-full rounded-[2rem] overflow-hidden border border-zinc-200/50 dark:border-white/10 shadow-sm">
                             <Map 
                                 center={[parseLocation((request as any).location)!.lng, parseLocation((request as any).location)!.lat]}
                                 zoom={14}
@@ -388,6 +390,7 @@ export default function RequestDetailPage() {
                                 className="h-full w-full"
                             />
                         </div>
+                    </div>
                     )}
 
                     {/* Real-time Responses Block */}

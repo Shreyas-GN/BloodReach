@@ -71,17 +71,17 @@ const MenuItem = ({
     bgClass: string,
     textClass: string
 }) => (
-    <div onClick={onClick} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
+    <div onClick={onClick} className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200/50 dark:border-white/10 shadow-[0_2px_8px_rgb(0,0,0,0.04)] flex items-center justify-between cursor-pointer hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors">
         <div className="flex items-center gap-4">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${bgClass} ${textClass}`}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${bgClass} ${textClass}`}>
                 {icon}
             </div>
             <div>
-                <h3 className="font-bold text-gray-900">{title}</h3>
-                {subtitle && <p className="text-xs text-gray-500 font-medium">{subtitle}</p>}
+                <h3 className="font-bold text-zinc-900 dark:text-white">{title}</h3>
+                {subtitle && <p className="text-xs text-zinc-500 font-medium">{subtitle}</p>}
             </div>
         </div>
-        <ChevronRight className="w-5 h-5 text-gray-400" />
+        <ChevronRight className="w-5 h-5 text-zinc-400" />
     </div>
 );
 
@@ -198,7 +198,7 @@ export default function SettingsPage() {
         }
     };
 
-    if (loading) return <div className="h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-brand-red"></div></div>;
+    if (loading) return <div className="h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950"><div className="w-8 h-8 rounded-full border-2 border-zinc-200 dark:border-zinc-800 border-t-crimson animate-spin" /></div>;
     if (!settings) return null;
 
     // --- Sub-Views ---
@@ -210,8 +210,8 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between">
                         <div>
                             <CardTitle className="flex items-center gap-2">
-                                <User className="w-5 h-5 text-purple-600" />
-                                Personal Identity
+                                <User className="w-5 h-5 text-zinc-600" />
+                                Personal Profile
                             </CardTitle>
                             <CardDescription>Manage your personal details</CardDescription>
                         </div>
@@ -229,24 +229,23 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 rounded-full bg-gray-200 overflow-hidden">
+                        <div className="w-16 h-16 rounded-full bg-zinc-200 overflow-hidden">
                             <img src={user?.imageUrl} alt="Profile" className="w-full h-full object-cover" />
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold text-gray-900">{profile?.first_name} {profile?.last_name}</h2>
-                            <p className="text-sm text-gray-500">{user?.primaryEmailAddress?.emailAddress}</p>
+                            <h2 className="text-lg font-bold text-zinc-900 dark:text-white">{profile?.first_name} {profile?.last_name}</h2>
+                            <p className="text-sm text-zinc-500">{user?.primaryEmailAddress?.emailAddress}</p>
                             <Badge variant="success" className="text-xs mt-1">Verified</Badge>
                         </div>
                     </div>
-                    {/* ... Same as before ... */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase">Phone</label>
-                            <p className="font-medium text-gray-900">{profile?.phone_number}</p>
+                            <label className="text-xs font-bold text-zinc-500 uppercase">Phone</label>
+                            <p className="font-medium text-zinc-900 dark:text-white">{profile?.phone_number}</p>
                         </div>
                         <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase">Member Since</label>
-                            <p className="font-medium text-gray-900">{profile?.date_joined ? new Date(profile.date_joined).toLocaleDateString() : 'N/A'}</p>
+                            <label className="text-xs font-bold text-zinc-500 uppercase">Member Since</label>
+                            <p className="font-medium text-zinc-900 dark:text-white">{profile?.date_joined ? new Date(profile.date_joined).toLocaleDateString() : 'N/A'}</p>
                         </div>
                     </div>
                 </CardContent>
@@ -424,23 +423,23 @@ export default function SettingsPage() {
     );
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-20">
+        <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 pb-20">
             {/* Header */}
-            <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
+            <header className="sticky top-0 z-50 bg-zinc-50/80 dark:bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-200/50 dark:border-white/10">
                 <nav className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         {view !== 'MENU' ? (
-                            <button onClick={() => setView('MENU')} className="p-2 hover:bg-gray-100 rounded-full">
-                                <ArrowLeft className="w-5 h-5 text-gray-600" />
+                            <button onClick={() => setView('MENU')} className="p-2 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-full transition-colors">
+                                <ArrowLeft className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
                             </button>
                         ) : (
-                            <Link href="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
+                            <Link href="/dashboard" className="flex items-center gap-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors">
                                 <ArrowLeft className="w-5 h-5" />
                                 <span className="font-medium text-sm">Dashboard</span>
                             </Link>
                         )}
                     </div>
-                    <h1 className="text-lg font-bold text-gray-900">
+                    <h1 className="text-lg font-bold text-zinc-900 dark:text-white">
                         {view === 'MENU' ? 'Settings' :
                             view === 'PROFILE' ? 'My Profile' :
                                 view === 'AVAILABILITY' ? 'Availability' :
@@ -488,8 +487,8 @@ export default function SettingsPage() {
                                 title="Availability & Safety"
                                 subtitle="Distance, Emergency filter"
                                 onClick={() => setView('AVAILABILITY')}
-                                bgClass="bg-orange-100"
-                                textClass="text-orange-600"
+                                bgClass="bg-amber-500/10"
+                                textClass="text-amber-600"
                             />
 
                             <MenuItem
@@ -497,8 +496,8 @@ export default function SettingsPage() {
                                 title="Notifications"
                                 subtitle="Push, Status updates"
                                 onClick={() => setView('NOTIFICATIONS')}
-                                bgClass="bg-blue-100"
-                                textClass="text-blue-600"
+                                bgClass="bg-zinc-100 dark:bg-white/5"
+                                textClass="text-zinc-600 dark:text-zinc-400"
                             />
 
                             <MenuItem
@@ -506,8 +505,8 @@ export default function SettingsPage() {
                                 title="Privacy & Safety"
                                 subtitle="Visibility controls"
                                 onClick={() => setView('PRIVACY')}
-                                bgClass="bg-green-100"
-                                textClass="text-green-600"
+                                bgClass="bg-emerald-500/10"
+                                textClass="text-emerald-600"
                             />
 
                             <MenuItem
@@ -515,8 +514,8 @@ export default function SettingsPage() {
                                 title="Account"
                                 subtitle="Logout, Deactivate"
                                 onClick={() => setView('ACCOUNT')}
-                                bgClass="bg-gray-100"
-                                textClass="text-gray-600"
+                                bgClass="bg-zinc-100 dark:bg-white/5"
+                                textClass="text-zinc-600 dark:text-zinc-400"
                             />
                         </motion.div>
                     ) : (

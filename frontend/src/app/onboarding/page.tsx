@@ -69,10 +69,10 @@ export default function OnboardingPage() {
                             <Droplet className="w-8 h-8 fill-crimson stroke-crimson" />
                         </div>
                         <h1 className="text-3xl sm:text-4xl font-extrabold text-zinc-900 dark:text-white tracking-tight">
-                            One last thing before you start.
+                            Complete your donor profile.
                         </h1>
                         <p className="text-base text-zinc-500 dark:text-zinc-400 max-w-lg mx-auto font-medium">
-                            Your blood group and location let us notify you when someone nearby needs help. This takes 30 seconds.
+                            Your blood group and city let us notify you only when someone nearby needs help. Takes 30 seconds.
                         </p>
                     </div>
 
