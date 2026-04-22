@@ -2,13 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useApiClient } from '@/lib/useApiClient';
+import { useUser } from '@clerk/nextjs';
+import { RequestService } from '@/services/request.service';
 import { AlertCircle, MapPin, Phone, User, Droplet, ArrowLeft, Save, Clock, Users } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
 
 const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const;
 
@@ -21,20 +19,21 @@ const requesterRelations = [
 
 const urgencyLevels = [
     { value: 'IMMEDIATE', label: 'Immediate (next few hours)', color: 'red' },
-    { value: 'TODAY', label: 'Today', color: 'orange' },
+    { value: 'TODAY', label: 'Today', color: 'amber' },
     { value: 'SCHEDULED', label: 'Scheduled', color: 'blue' },
 ] as const;
 
 const fadeInUp = {
-    initial: { opacity: 0, y: 20 },
+    initial: { opacity: 0, y: 15 },
     animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.4 }
+    transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] }
 };
 
 export default function EditRequestPage() {
     const params = useParams();
     const router = useRouter();
-    const api = useApiClient();
+    const { user, isLoaded } = useUser();
+    
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -62,12 +61,11 @@ export default function EditRequestPage() {
                     return;
                 }
 
-                setRequest(response as any);
                 setFormData({
                     blood_group: response.blood_group,
                     units: response.units,
                     patient_name: response.patient_name || '',
-                    hospital_name: response.hospital_name,
+                    hospital_name: response.hospital_name || '',
                     city: response.city || '',
                     contact_phone: response.contact_phone || '',
                     requester_relation: response.requester_relation || 'MYSELF',
@@ -99,53 +97,37 @@ export default function EditRequestPage() {
             await RequestService.updateRequest(params.id as string, formData);
             router.push(`/request/${params.id}`);
         } catch (err: any) {
-                } else {
-                    const errorMessages = Object.entries(data)
-                        .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
-                        .join(' | ');
-                    setError(errorMessages);
-                }
-            } else {
-                setError('Failed to update request. Please try again.');
-            }
+            setError(err.message || 'Failed to update request. Please try again.');
         } finally {
             setSaving(false);
         }
     };
 
-    if (loading) {
+    if (loading || !isLoaded) {
         return (
-            <div className="h-screen flex items-center justify-center bg-gradient-to-br from-brand-cream to-white">
-                <div className="text-center space-y-4">
-                    <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-brand-red mx-auto"></div>
-                    <p className="text-gray-600 font-medium">Loading request...</p>
+            <div className="min-h-[100dvh] flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+                <div className="w-12 h-12 relative flex items-center justify-center">
+                    <div className="absolute inset-0 rounded-full border-2 border-zinc-200 dark:border-zinc-800" />
+                    <div className="absolute inset-0 rounded-full border-2 border-crimson border-t-transparent animate-spin" />
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-brand-cream via-white to-red-50">
+        <div className="min-h-[100dvh] bg-zinc-50 dark:bg-zinc-950 selection:bg-crimson/30 pb-safe">
             {/* Header */}
-            <header className="sticky top-0 z-50 glass border-b border-gray-200/50">
-                <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-                    <Link href={`/request/${params.id}`} className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors">
-                        <ArrowLeft className="w-5 h-5" />
-                        <span className="font-medium">Back to Request</span>
+            <header className="sticky top-0 z-50 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-xl border-b border-zinc-200/50 dark:border-white/10">
+                <nav className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
+                    <Link href={`/request/${params.id}`} className="flex items-center gap-2 text-sm font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors">
+                        <ArrowLeft className="w-4 h-4" />
+                        Back to Case
                     </Link>
-
-                    <div className="flex items-center gap-2">
-                        <Droplet className="w-8 h-8 text-brand-red" />
-                        <span className="text-2xl font-bold">
-                            <span className="text-brand-red">Pulse</span>
-                            <span className="text-brand-blue">Aid</span>
-                        </span>
-                    </div>
                 </nav>
             </header>
 
             {/* Main Content */}
-            <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <main className="max-w-4xl mx-auto px-6 py-8">
                 <motion.div
                     initial="initial"
                     animate="animate"
@@ -153,260 +135,245 @@ export default function EditRequestPage() {
                     className="space-y-8"
                 >
                     {/* Page Header */}
-                    <div className="text-center space-y-3">
-                        <h1 className="text-4xl font-bold text-gray-900">Edit Blood Request</h1>
-                        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                            Update the details of your blood request below.
-                        </p>
+                    <div className="space-y-2">
+                        <h1 className="text-3xl font-extrabold text-zinc-900 dark:text-white tracking-tight">Edit Case File</h1>
+                        <p className="text-zinc-500 font-medium">Update the details of your blood request.</p>
                     </div>
 
                     {/* Form Card */}
-                    <Card variant="elevated" padding="lg" className="border-t-4 border-t-brand-blue">
-                        {error && (
-                            <motion.div
-                                initial={{ opacity: 0, y: -10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-lg"
-                            >
-                                <div className="flex items-start gap-3">
-                                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                                    <div className="flex-1">
-                                        <h3 className="font-semibold text-red-800">Error Updating Request</h3>
-                                        <p className="text-sm text-red-600 mt-1">{error}</p>
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-white/10 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden">
+                        
+                        <div className="p-6 sm:p-10">
+                            {error && (
+                                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-8 p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-start gap-3">
+                                    <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                                    <div>
+                                        <h3 className="font-bold text-rose-800 dark:text-rose-400">Update Failed</h3>
+                                        <p className="text-sm font-medium text-rose-700/70 dark:text-rose-500/70 mt-1">{error}</p>
                                     </div>
-                                </div>
-                            </motion.div>
-                        )}
+                                </motion.div>
+                            )}
 
-                        <form onSubmit={handleSubmit} className="space-y-8">
-                            {/* Blood Requirements Section */}
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <Droplet className="w-5 h-5 text-brand-red" />
-                                    <h2 className="text-xl font-bold text-gray-900">Blood Requirements</h2>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="block text-sm font-semibold text-gray-700">
-                                            Blood Group <span className="text-red-500">*</span>
-                                        </label>
-                                        <select
-                                            required
-                                            value={formData.blood_group}
-                                            onChange={(e) => setFormData({ ...formData, blood_group: e.target.value })}
-                                            className="w-full h-10 px-4 rounded-lg border border-gray-300 bg-white text-sm transition-smooth focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-transparent"
-                                        >
-                                            <option value="">Select Blood Group</option>
-                                            {bloodGroups.map((bg) => (
-                                                <option key={bg} value={bg}>{bg}</option>
-                                            ))}
-                                        </select>
+                            <form onSubmit={handleSubmit} className="space-y-10">
+                                {/* Blood Requirements Section */}
+                                <div className="space-y-5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-crimson/10 flex items-center justify-center">
+                                            <Droplet className="w-4 h-4 text-crimson" />
+                                        </div>
+                                        <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Requirements</h2>
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <label className="block text-sm font-semibold text-gray-700">
-                                            Units Needed <span className="text-red-500">*</span>
-                                        </label>
-                                        <Input
-                                            type="number"
-                                            required
-                                            min="1"
-                                            max="20"
-                                            value={formData.units || ''}
-                                            onChange={(e) => {
-                                                const val = parseInt(e.target.value);
-                                                setFormData({ ...formData, units: isNaN(val) ? 0 : val });
-                                            }}
-                                            placeholder="1"
-                                        />
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="block text-sm font-bold text-zinc-700 dark:text-zinc-300">Blood Type <span className="text-crimson">*</span></label>
+                                            <select
+                                                required
+                                                value={formData.blood_group}
+                                                onChange={(e) => setFormData({ ...formData, blood_group: e.target.value })}
+                                                className="w-full h-12 px-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-crimson/20 focus:border-crimson transition-all"
+                                            >
+                                                <option value="">Select Type</option>
+                                                {bloodGroups.map((bg) => (
+                                                    <option key={bg} value={bg}>{bg}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="block text-sm font-bold text-zinc-700 dark:text-zinc-300">Units Needed <span className="text-crimson">*</span></label>
+                                            <input
+                                                type="number"
+                                                required
+                                                min="1"
+                                                max="20"
+                                                value={formData.units || ''}
+                                                onChange={(e) => {
+                                                    const val = parseInt(e.target.value);
+                                                    setFormData({ ...formData, units: isNaN(val) ? 0 : val });
+                                                }}
+                                                placeholder="1"
+                                                className="w-full h-12 px-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-crimson/20 focus:border-crimson transition-all"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* Urgency Level */}
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <Clock className="w-5 h-5 text-orange-600" />
-                                    <h2 className="text-xl font-bold text-gray-900">Urgency Level</h2>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    {urgencyLevels.map((level) => (
-                                        <button
-                                            key={level.value}
-                                            type="button"
-                                            onClick={() => setFormData({ ...formData, urgency_level: level.value })}
-                                            className={`p-4 rounded-lg border-2 transition-all text-left ${formData.urgency_level === level.value
-                                                ? level.color === 'red'
-                                                    ? 'border-red-500 bg-red-50'
-                                                    : level.color === 'orange'
-                                                        ? 'border-orange-500 bg-orange-50'
-                                                        : 'border-blue-500 bg-blue-50'
-                                                : 'border-gray-200 hover:border-gray-300'
-                                                }`}
-                                        >
-                                            <p className="font-semibold text-gray-900">{level.label}</p>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Patient & Hospital Section */}
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <User className="w-5 h-5 text-blue-600" />
-                                    <h2 className="text-xl font-bold text-gray-900">Patient & Hospital Details</h2>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="block text-sm font-semibold text-gray-700">
-                                            Patient Name <span className="text-red-500">*</span>
-                                        </label>
-                                        <Input
-                                            type="text"
-                                            required
-                                            minLength={3}
-                                            placeholder="John Doe"
-                                            value={formData.patient_name}
-                                            onChange={(e) => setFormData({ ...formData, patient_name: e.target.value })}
-                                        />
+                                {/* Urgency Level */}
+                                <div className="space-y-5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                                            <Clock className="w-4 h-4 text-orange-500" />
+                                        </div>
+                                        <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Urgency Level</h2>
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <label className="block text-sm font-semibold text-gray-700">
-                                            Hospital Name <span className="text-red-500">*</span>
-                                        </label>
-                                        <Input
-                                            type="text"
-                                            required
-                                            minLength={3}
-                                            placeholder="City Hospital"
-                                            value={formData.hospital_name}
-                                            onChange={(e) => setFormData({ ...formData, hospital_name: e.target.value })}
-                                        />
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        {urgencyLevels.map((level) => (
+                                            <button
+                                                key={level.value}
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, urgency_level: level.value })}
+                                                className={`p-4 rounded-xl border-2 transition-all text-left ${formData.urgency_level === level.value
+                                                    ? level.color === 'red'
+                                                        ? 'border-rose-500 bg-rose-500/10'
+                                                        : level.color === 'amber'
+                                                            ? 'border-amber-500 bg-amber-500/10'
+                                                            : 'border-blue-500 bg-blue-500/10'
+                                                    : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
+                                                    }`}
+                                            >
+                                                <p className={`font-bold ${formData.urgency_level === level.value ? (level.color === 'red' ? 'text-rose-700 dark:text-rose-400' : level.color === 'amber' ? 'text-amber-700 dark:text-amber-400' : 'text-blue-700 dark:text-blue-400') : 'text-zinc-600 dark:text-zinc-400'}`}>
+                                                    {level.label}
+                                                </p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Patient & Hospital Section */}
+                                <div className="space-y-5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                                            <User className="w-4 h-4 text-blue-500" />
+                                        </div>
+                                        <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Patient Details</h2>
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <label className="block text-sm font-semibold text-gray-700">
-                                            City <span className="text-red-500">*</span>
-                                        </label>
-                                        <div className="relative">
-                                            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                            <Input
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="block text-sm font-bold text-zinc-700 dark:text-zinc-300">Patient Name <span className="text-crimson">*</span></label>
+                                            <input
                                                 type="text"
                                                 required
                                                 minLength={3}
-                                                className="pl-10"
-                                                placeholder="e.g. Bangalore"
-                                                value={formData.city}
-                                                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                                placeholder="Patient's full name"
+                                                value={formData.patient_name}
+                                                onChange={(e) => setFormData({ ...formData, patient_name: e.target.value })}
+                                                className="w-full h-12 px-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-crimson/20 focus:border-crimson transition-all"
                                             />
                                         </div>
-                                    </div>
 
-                                    <div className="space-y-2">
-                                        <label className="block text-sm font-semibold text-gray-700">
-                                            Contact Number <span className="text-red-500">*</span>
-                                        </label>
-                                        <div className="relative">
-                                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                            <Input
-                                                type="tel"
+                                        <div className="space-y-2">
+                                            <label className="block text-sm font-bold text-zinc-700 dark:text-zinc-300">Hospital Name <span className="text-crimson">*</span></label>
+                                            <input
+                                                type="text"
                                                 required
-                                                minLength={10}
-                                                maxLength={10}
-                                                pattern="[0-9]{10}"
-                                                className="pl-10"
-                                                placeholder="9876543210"
-                                                value={formData.contact_phone}
-                                                onChange={(e) => {
-                                                    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                                                    setFormData({ ...formData, contact_phone: val });
-                                                }}
+                                                minLength={3}
+                                                placeholder="Name of the hospital"
+                                                value={formData.hospital_name}
+                                                onChange={(e) => setFormData({ ...formData, hospital_name: e.target.value })}
+                                                className="w-full h-12 px-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-crimson/20 focus:border-crimson transition-all"
                                             />
                                         </div>
-                                        <p className="text-xs text-gray-500">Exactly 10 digits</p>
+
+                                        <div className="space-y-2">
+                                            <label className="block text-sm font-bold text-zinc-700 dark:text-zinc-300">City <span className="text-crimson">*</span></label>
+                                            <div className="relative">
+                                                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                                                <input
+                                                    type="text"
+                                                    required
+                                                    minLength={3}
+                                                    className="w-full h-12 pl-11 pr-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-crimson/20 focus:border-crimson transition-all"
+                                                    placeholder="City name"
+                                                    value={formData.city}
+                                                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="block text-sm font-bold text-zinc-700 dark:text-zinc-300">Contact Number <span className="text-crimson">*</span></label>
+                                            <div className="relative">
+                                                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                                                <input
+                                                    type="tel"
+                                                    required
+                                                    minLength={10}
+                                                    maxLength={10}
+                                                    pattern="[0-9]{10}"
+                                                    className="w-full h-12 pl-11 pr-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-crimson/20 focus:border-crimson transition-all"
+                                                    placeholder="10-digit number"
+                                                    value={formData.contact_phone}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                                        setFormData({ ...formData, contact_phone: val });
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* Requester Relation */}
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <Users className="w-5 h-5 text-purple-600" />
-                                    <h2 className="text-xl font-bold text-gray-900">Your Relation to Patient</h2>
+                                {/* Requester Relation */}
+                                <div className="space-y-5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                                            <Users className="w-4 h-4 text-purple-500" />
+                                        </div>
+                                        <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Relation to Patient</h2>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        {requesterRelations.map((relation) => (
+                                            <button
+                                                key={relation.value}
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, requester_relation: relation.value })}
+                                                className={`p-4 rounded-xl border-2 transition-all ${formData.requester_relation === relation.value
+                                                    ? 'border-purple-500 bg-purple-500/10 text-purple-700 dark:text-purple-400'
+                                                    : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-600 dark:text-zinc-400'
+                                                    }`}
+                                            >
+                                                <p className="font-bold text-center text-sm">{relation.label}</p>
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    {requesterRelations.map((relation) => (
+                                {/* Additional Notes */}
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-bold text-zinc-700 dark:text-zinc-300">Additional Notes</label>
+                                    <textarea
+                                        rows={3}
+                                        maxLength={150}
+                                        placeholder="Any additional information..."
+                                        value={formData.note}
+                                        onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                                        className="w-full p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-crimson/20 focus:border-crimson transition-all resize-none"
+                                    />
+                                    <p className="text-xs font-medium text-zinc-500">{formData.note.length}/150 characters</p>
+                                </div>
+
+                                {/* Submit Buttons */}
+                                <div className="pt-8 border-t border-zinc-200/50 dark:border-white/10 flex flex-col-reverse sm:flex-row gap-4">
+                                    <Link href={`/request/${params.id}`} className="w-full sm:w-auto">
                                         <button
-                                            key={relation.value}
                                             type="button"
-                                            onClick={() => setFormData({ ...formData, requester_relation: relation.value })}
-                                            className={`p-4 rounded-lg border-2 transition-all ${formData.requester_relation === relation.value
-                                                ? 'border-purple-500 bg-purple-50 text-purple-900'
-                                                : 'border-gray-200 hover:border-gray-300'
-                                                }`}
+                                            className="w-full sm:w-auto px-8 py-4 bg-transparent border-2 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-bold rounded-2xl flex items-center justify-center transition-all hover:bg-zinc-100 dark:hover:bg-white/5 hover:border-zinc-300 dark:hover:border-zinc-700"
                                         >
-                                            <p className="font-semibold text-center">{relation.label}</p>
+                                            Cancel
                                         </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Additional Notes */}
-                            <div className="space-y-2">
-                                <label className="block text-sm font-semibold text-gray-700">
-                                    Additional Notes (Optional)
-                                </label>
-                                <textarea
-                                    rows={3}
-                                    maxLength={150}
-                                    placeholder="Any additional information for donors (max 150 characters)..."
-                                    value={formData.note}
-                                    onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                                    className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-sm transition-smooth placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-red focus:border-transparent resize-none"
-                                />
-                                <p className="text-xs text-gray-500">{formData.note.length}/150 characters</p>
-                            </div>
-
-                            {/* Submit Buttons */}
-                            <div className="pt-6 border-t border-gray-200 flex gap-4">
-                                <Link href={`/request/${params.id}`} className="flex-1">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="lg"
-                                        className="w-full"
+                                    </Link>
+                                    <button
+                                        type="submit"
+                                        disabled={saving}
+                                        className="w-full sm:flex-1 py-4 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-lg font-bold rounded-2xl flex items-center justify-center shadow-md transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:scale-100"
                                     >
-                                        Cancel
-                                    </Button>
-                                </Link>
-                                <Button
-                                    type="submit"
-                                    disabled={saving}
-                                    size="lg"
-                                    className="flex-1 shadow-xl hover:shadow-2xl"
-                                >
-                                    {saving ? (
-                                        <>
-                                            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
-                                            Saving Changes...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Save className="w-5 h-5" />
-                                            Save Changes
-                                        </>
-                                    )}
-                                </Button>
-                            </div>
-                        </form>
-                    </Card>
+                                        {saving ? (
+                                            <><span className="w-5 h-5 rounded-full border-2 border-zinc-500 border-t-transparent animate-spin mr-3" /> Saving...</>
+                                        ) : (
+                                            <><Save className="w-5 h-5 mr-2" /> Save Changes</>
+                                        )}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                 </motion.div>
             </main>
         </div>
     );
 }
+

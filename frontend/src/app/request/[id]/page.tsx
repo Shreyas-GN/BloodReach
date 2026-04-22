@@ -2,16 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useApiClient } from '@/lib/useApiClient';
 import { useUser } from '@clerk/nextjs';
 import { DonorService } from '@/services/donor.service';
-import { AlertCircle, Droplet, MapPin, Phone, User, Clock, CheckCircle, ArrowLeft, Heart, Edit, Trash2, Share2, Shield } from 'lucide-react';
+import { RequestService } from '@/services/request.service';
+import { AlertCircle, Droplet, MapPin, Phone, User, Clock, CheckCircle, ArrowLeft, Heart, Share2, Shield, Activity } from 'lucide-react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Badge } from '@/components/ui/Badge';
-import { CancelRequestButton } from '@/components/CancelRequestButton';
 import { AlertService } from '@/services/alert.service';
 
 interface BloodRequest {
@@ -33,12 +30,6 @@ interface BloodRequest {
         last_name: string;
         phone_number?: string;
     };
-    assigned_donor?: {
-        id: number;
-        first_name: string;
-        last_name: string;
-        phone_number?: string;
-    };
 }
 
 interface MatchingDonor {
@@ -50,30 +41,26 @@ interface MatchingDonor {
     distance_km: number;
 }
 
-interface BloodBank {
-    id: number;
-    name: string;
-    city: string;
-    phone_number: string;
-    address: string;
-}
-
 const fadeInUp = {
-    initial: { opacity: 0, y: 20 },
+    initial: { opacity: 0, y: 15 },
     animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.4 }
+    transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] }
+};
+
+const URGENCY_COLOR: Record<string, string> = {
+    IMMEDIATE: "bg-rose-500 text-white border-rose-500",
+    TODAY: "bg-amber-500 text-zinc-900 border-amber-500",
+    SCHEDULED: "bg-blue-500 text-white border-blue-500",
 };
 
 export default function RequestDetailPage() {
     const params = useParams();
     const router = useRouter();
-    const api = useApiClient();
-    const { user } = useUser();
+    const { user, isLoaded } = useUser();
 
     const [request, setRequest] = useState<BloodRequest | null>(null);
     const [donors, setDonors] = useState<MatchingDonor[]>([]);
     const [acceptedDonors, setAcceptedDonors] = useState<any[]>([]);
-    const [bloodBanks, setBloodBanks] = useState<BloodBank[]>([]);
     const [loading, setLoading] = useState(true);
     const [accepting, setAccepting] = useState(false);
     const [currentUserProfile, setCurrentUserProfile] = useState<any | null>(null);
@@ -82,26 +69,23 @@ export default function RequestDetailPage() {
     useEffect(() => {
         const fetchRequest = async () => {
             try {
-                const response = await api.get(`requests/${params.id}/`);
-                setRequest(response.data);
+                // We use RequestService now instead of old API client
+                const requestData = await RequestService.getRequestById(params.id as string);
+                setRequest(requestData as any);
 
-                if (response.data.status === 'CREATED' || response.data.status === 'SEARCHING_FOR_DONORS') {
+                if (requestData.status === 'CREATED' || requestData.status === 'SEARCHING_FOR_DONORS' || requestData.status === 'open') {
                     try {
                         let matchingDonors = [];
-                        let fallbackBloodBanks = [];
 
-                        // 1. Try fetching via PostGIS RPC first if location exists
-                        const locMatch = response.data.location?.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
+                        const locMatch = requestData.location?.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
                         if (locMatch) {
                             const lng = parseFloat(locMatch[1]);
                             const lat = parseFloat(locMatch[2]);
                             
-                            // 20km radius search
                             const nearbyDonors = await DonorService.getNearbyDonors(lat, lng, 20); 
                             
-                            // Filter by exact blood group match
                             matchingDonors = nearbyDonors
-                                .filter((d: any) => d.blood_group === response.data.blood_group)
+                                .filter((d: any) => d.blood_group === requestData.blood_group)
                                 .map((d: any) => ({
                                     id: d.id,
                                     name: d.full_name,
@@ -111,24 +95,12 @@ export default function RequestDetailPage() {
                                     distance_km: Math.round(d.distance_meters / 100) / 10 
                                 }));
                         }
-
-                        // Fallback to old API if RPC returned nothing (e.g. migration transition)
-                        if (matchingDonors.length === 0) {
-                            try {
-                                const donorsResponse = await api.get(`requests/${params.id}/donors/`);
-                                matchingDonors = donorsResponse.data.matching_donors || [];
-                                fallbackBloodBanks = donorsResponse.data.fallback_blood_banks || [];
-                            } catch (fallbackErr) {}
-                        }
-
                         setDonors(matchingDonors);
-                        setBloodBanks(fallbackBloodBanks);
                     } catch (e) {
                         console.error('Error fetching nearby donors:', e);
                     }
                 }
                 
-                // Fetch donor responses for this request
                 try {
                     const responses = await DonorService.getResponsesForRequest(params.id as string);
                     setAcceptedDonors(responses);
@@ -137,25 +109,27 @@ export default function RequestDetailPage() {
                 }
             } catch (err: any) {
                 console.error('Error fetching request:', err);
-                setError(err.response?.status === 404 ? 'Request not found' : 'Failed to load request');
+                setError('Request not found or no longer available.');
             } finally {
                 setLoading(false);
             }
         };
 
         const fetchCurrentUser = async () => {
+            if (!user?.id) return;
             try {
-                const response = await api.get('users/profile/');
-                setCurrentUserProfile(response.data);
+                const profileData = await DonorService.getProfile(user.id);
+                setCurrentUserProfile(profileData);
             } catch (err) { }
         };
 
         if (params.id) {
             fetchRequest();
-            if (user) fetchCurrentUser();
+        }
+        if (isLoaded && user) {
+            fetchCurrentUser();
         }
         
-        // --- Real-time Subscription ---
         let channel: any;
         const setupRealtime = async () => {
             const { supabaseClient } = await import('@/lib/supabase/client');
@@ -170,13 +144,10 @@ export default function RequestDetailPage() {
                         filter: `request_id=eq.${params.id}`
                     },
                     async (payload) => {
-                        console.log('Live update: donor response changed!', payload);
                         try {
                             const responses = await DonorService.getResponsesForRequest(params.id as string);
                             setAcceptedDonors(responses);
-                        } catch (e) {
-                            console.error('Failed to refetch responses:', e);
-                        }
+                        } catch (e) {}
                     }
                 )
                 .subscribe();
@@ -187,15 +158,14 @@ export default function RequestDetailPage() {
         }
 
         return () => {
-            if (channel) {
-                channel.unsubscribe();
-            }
+            if (channel) channel.unsubscribe();
         };
-    }, [params.id, api, user]);
+    }, [params.id, user, isLoaded]);
 
     const handleAcceptRequest = async () => {
         if (!currentUserProfile?.id) {
             alert('Please complete your profile to donate.');
+            router.push('/onboarding');
             return;
         }
         
@@ -203,317 +173,281 @@ export default function RequestDetailPage() {
         try {
             await DonorService.submitDonorResponse(params.id as string, currentUserProfile.id.toString());
             
-            // Send Alert to Requester
             if (request?.contact_phone) {
                 await AlertService.sendSMS(
                     request.contact_phone, 
-                    `PULSE-AID ALERT: Good news! ${currentUserProfile.full_name || 'A donor'} has offered to donate blood for ${request.patient_name}. They may contact you shortly. Please check your Pulse-Aid dashboard for their details.`
+                    `PULSE-AID ALERT: Good news! ${currentUserProfile.full_name || 'A donor'} has offered to donate blood for ${request.patient_name}. They may contact you shortly.`
                 );
             }
             
-            // Fetch updated responses
             const responses = await DonorService.getResponsesForRequest(params.id as string);
             setAcceptedDonors(responses);
             
-            alert('Thank you! You are now responding to this request.');
         } catch (error: any) {
-            alert(error.message || 'Failed to accept request');
+            alert(error.message || 'We could not process this right now. Please try again.');
         } finally {
             setAccepting(false);
         }
     };
 
-    const handleCompleteRequest = async () => {
+    const handleCancelRequest = async () => {
+        if (!confirm("Are you sure you want to cancel this request? This cannot be undone.")) return;
         try {
-            await api.post(`requests/${params.id}/complete/`);
+            await RequestService.updateRequest(params.id as string, { status: 'cancelled' });
             router.push('/dashboard');
         } catch (error: any) {
-            alert(error.response?.data?.error || 'Failed to complete request');
+            alert('Could not cancel request. Please try again.');
         }
     };
 
-    if (loading) return <div className="h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-brand-red"></div></div>;
+    const handleCompleteRequest = async () => {
+        try {
+            await RequestService.updateRequest(params.id as string, { status: 'fulfilled' });
+            router.push('/dashboard');
+        } catch (error: any) {
+            alert('Could not mark as completed. Please try again.');
+        }
+    };
+
+    if (loading || !isLoaded) {
+        return (
+            <div className="min-h-[100dvh] flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+                <div className="w-12 h-12 relative flex items-center justify-center">
+                    <div className="absolute inset-0 rounded-full border-2 border-zinc-200 dark:border-zinc-800" />
+                    <div className="absolute inset-0 rounded-full border-2 border-crimson border-t-transparent animate-spin" />
+                </div>
+            </div>
+        );
+    }
 
     if (!request || error) {
         return (
-            <div className="h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
-                <AlertCircle className="w-12 h-12 text-gray-400" />
-                <h2 className="text-xl font-bold text-gray-700">{error || 'Request Not Found'}</h2>
-                <Link href="/dashboard"><Button variant="outline">Back to Dashboard</Button></Link>
+            <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-6 text-center">
+                <div className="w-16 h-16 bg-zinc-100 dark:bg-white/5 rounded-2xl flex items-center justify-center mb-6">
+                    <AlertCircle className="w-8 h-8 text-zinc-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">{error || 'Case Closed or Unavailable'}</h2>
+                <p className="text-zinc-500 mb-8 max-w-sm">This request may have been completed, cancelled, or the link is incorrect.</p>
+                <Link href="/dashboard">
+                    <button className="px-6 py-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold rounded-xl shadow-md transition-transform hover:scale-105 active:scale-95">
+                        Return to Dashboard
+                    </button>
+                </Link>
             </div>
         );
     }
 
     const isRequester = currentUserProfile?.id === request?.requester?.id;
+    const isResponding = acceptedDonors.some(d => d.donor_id === currentUserProfile?.id);
+    const isClosed = request.status === 'COMPLETED' || request.status === 'CANCELLED' || request.status === 'cancelled' || request.status === 'fulfilled';
 
     return (
-        <div className="min-h-screen bg-gray-50/50">
-            {/* Header */}
-            <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
-                <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-                    <Link href="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors">
-                        <ArrowLeft className="w-5 h-5" />
-                        <span className="font-medium">Dashboard</span>
+        <div className="min-h-[100dvh] bg-zinc-50 dark:bg-zinc-950 selection:bg-crimson/30 pb-safe">
+            
+            {/* Nav Header */}
+            <header className="sticky top-0 z-50 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-xl border-b border-zinc-200/50 dark:border-white/10">
+                <nav className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
+                    <Link href="/dashboard" className="flex items-center gap-2 text-sm font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors">
+                        <ArrowLeft className="w-4 h-4" />
+                        Dashboard
                     </Link>
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-gray-400">Request #{request.id}</span>
-                        <Badge variant={request.status === 'COMPLETED' ? 'default' : request.status === 'CANCELLED' ? 'danger' : 'info'}>
-                            {request.status.replace('_', ' ')}
-                        </Badge>
+                    <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-widest">Case {request.id.toString().padStart(4, '0')}</span>
                     </div>
                 </nav>
             </header>
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <motion.div initial="initial" animate="animate" variants={fadeInUp} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-                    {/* Main Content */}
-                    <div className="lg:col-span-2 space-y-6">
-
-                        {/* Urgency Banner */}
-                        {request.urgency_level === 'IMMEDIATE' && request.status !== 'COMPLETED' && request.status !== 'CANCELLED' && (
-                            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg flex items-center justify-between shadow-sm animate-pulse-slow">
-                                <div className="flex items-center gap-3">
-                                    <Shield className="w-6 h-6 text-red-600" />
-                                    <div>
-                                        <p className="font-bold text-red-900">Critical Requirement</p>
-                                        <p className="text-xs text-red-700">Immediate donation required within 4 hours.</p>
-                                    </div>
+            <main className="max-w-4xl mx-auto px-6 py-8">
+                <motion.div initial="initial" animate="animate" variants={fadeInUp} className="space-y-8">
+                    
+                    {/* Urgency Banner - V2 Minimalist Style */}
+                    {request.urgency_level === 'IMMEDIATE' && !isClosed && (
+                        <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-2xl flex items-start sm:items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" />
+                                <div>
+                                    <p className="font-bold text-rose-800 dark:text-rose-400 text-sm">Critical Case</p>
+                                    <p className="text-xs font-medium text-rose-700/70 dark:text-rose-500/70">Blood needed in the next few hours.</p>
                                 </div>
-                                <span className="bg-red-200 text-red-800 text-xs font-bold px-2 py-1 rounded">URGENT</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Main Case File */}
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-white/10 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden relative">
+                        {isClosed && (
+                            <div className="absolute inset-0 bg-white/60 dark:bg-zinc-950/60 backdrop-blur-[2px] z-10 flex items-center justify-center">
+                                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3">
+                                    {request.status.toLowerCase() === 'cancelled' ? (
+                                        <><AlertCircle className="w-5 h-5 text-zinc-400" /><span className="font-bold text-zinc-900 dark:text-white">This request was cancelled.</span></>
+                                    ) : (
+                                        <><CheckCircle className="w-5 h-5 text-emerald-500" /><span className="font-bold text-zinc-900 dark:text-white">This request has been fulfilled.</span></>
+                                    )}
+                                </div>
                             </div>
                         )}
+                        
+                        <div className="p-6 sm:p-10">
+                            <div className="flex flex-col sm:flex-row gap-8 sm:items-start">
+                                
+                                {/* Blood Group Marker */}
+                                <div className={`shrink-0 w-28 h-28 rounded-[1.5rem] flex flex-col items-center justify-center border-2 ${URGENCY_COLOR[request.urgency_level ?? ""] ?? "bg-zinc-100 text-zinc-900 border-zinc-200"}`}>
+                                    <span className="text-4xl font-black tracking-tighter mb-1">{request.blood_group}</span>
+                                    <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">Needed</span>
+                                </div>
 
-                        {/* Primary Request Card */}
-                        <Card className="border-gray-200 shadow-sm overflow-hidden">
-                            <div className={`h-2 w-full ${request.urgency_level === 'IMMEDIATE' ? 'bg-gradient-to-r from-red-500 to-red-600' :
-                                request.urgency_level === 'TODAY' ? 'bg-gradient-to-r from-orange-400 to-orange-500' : 'bg-blue-500'
-                                }`} />
-                            <CardContent className="p-8">
-                                <div className="flex flex-col md:flex-row gap-6 items-start">
-                                    {/* Blood Group Badge */}
-                                    <div className={`flex-shrink-0 w-24 h-24 rounded-2xl flex items-center justify-center shadow-lg ${request.urgency_level === 'IMMEDIATE' ? 'bg-gradient-to-br from-red-500 to-red-600 text-white' :
-                                        request.urgency_level === 'TODAY' ? 'bg-gradient-to-br from-orange-400 to-orange-600 text-white' :
-                                            'bg-white border-2 border-blue-500 text-blue-600'
-                                        }`}>
-                                        <div className="text-center">
-                                            <span className="block text-3xl font-black">{request.blood_group}</span>
-                                            <span className="text-[10px] font-bold opacity-80 uppercase tracking-widest">Type</span>
-                                        </div>
+                                {/* Patient Details */}
+                                <div className="flex-1 space-y-5">
+                                    <div>
+                                        <h1 className="text-3xl font-extrabold text-zinc-900 dark:text-white tracking-tight mb-1">{request.patient_name}</h1>
+                                        <p className="text-lg font-medium text-zinc-500 dark:text-zinc-400">{request.hospital_name}</p>
                                     </div>
 
-                                    {/* Details */}
-                                    <div className="flex-1 space-y-4">
+                                    <div className="flex flex-wrap gap-2">
+                                        <div className="inline-flex items-center gap-1.5 bg-zinc-100 dark:bg-white/5 px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-600 dark:text-zinc-300">
+                                            <MapPin className="w-3.5 h-3.5" /> {request.city}
+                                        </div>
+                                        <div className="inline-flex items-center gap-1.5 bg-zinc-100 dark:bg-white/5 px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-600 dark:text-zinc-300">
+                                            <Droplet className="w-3.5 h-3.5" /> {request.units} Unit{request.units > 1 ? 's' : ''}
+                                        </div>
+                                        <div className="inline-flex items-center gap-1.5 bg-zinc-100 dark:bg-white/5 px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-600 dark:text-zinc-300">
+                                            <Clock className="w-3.5 h-3.5" /> Posted {new Date(request.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="my-8 border-t border-zinc-200/50 dark:border-white/10" />
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                                <div className="space-y-3">
+                                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Point of Contact</h3>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-white/5 flex items-center justify-center text-zinc-900 dark:text-white">
+                                            <Phone className="w-4 h-4" />
+                                        </div>
                                         <div>
-                                            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">{request.patient_name}</h1>
-                                            <p className="text-gray-500 text-lg">{request.hospital_name}</p>
-                                        </div>
-
-                                        <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-                                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
-                                                <MapPin className="w-4 h-4 text-gray-400" /> {request.city}
-                                            </div>
-                                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
-                                                <Droplet className="w-4 h-4 text-gray-400" /> {request.units} Units
-                                            </div>
-                                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
-                                                <Clock className="w-4 h-4 text-gray-400" /> {new Date(request.created_at).toLocaleDateString()}
-                                            </div>
+                                            <p className="font-extrabold text-zinc-900 dark:text-white text-lg font-mono tracking-tight">{request.contact_phone}</p>
+                                            <p className="text-xs font-medium text-zinc-500">Call to coordinate location</p>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Divider */}
-                                <div className="my-8 border-t border-gray-100"></div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div className="space-y-4">
-                                        <h3 className="font-bold text-gray-900 uppercase text-xs tracking-wider">Contact Details</h3>
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-600">
-                                                <Phone className="w-5 h-5" />
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-gray-900 text-lg">{request.contact_phone}</p>
-                                                <p className="text-xs text-gray-500">Call for location details</p>
-                                            </div>
+                                <div className="space-y-3">
+                                    <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Requester</h3>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-white/5 flex items-center justify-center text-zinc-900 dark:text-white">
+                                            <User className="w-4 h-4" />
                                         </div>
-                                    </div>
-                                    <div className="space-y-4">
-                                        <h3 className="font-bold text-gray-900 uppercase text-xs tracking-wider">Requester</h3>
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
-                                                <User className="w-5 h-5" />
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-gray-900">{request.requester.first_name} {request.requester.last_name}</p>
-                                                <p className="text-xs text-gray-500">Relation: {request.requester_relation}</p>
-                                            </div>
+                                        <div>
+                                            <p className="font-bold text-zinc-900 dark:text-white">{request.requester?.first_name || 'Anonymous'}</p>
+                                            <p className="text-xs font-medium text-zinc-500">Relation: {request.requester_relation?.toLowerCase() || 'unspecified'}</p>
                                         </div>
                                     </div>
                                 </div>
-
-                                {request.note && (
-                                    <div className="mt-8 p-6 bg-gray-50 rounded-xl border border-gray-100">
-                                        <p className="text-gray-600 italic">" {request.note} "</p>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        {/* Status Actions */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {isRequester ? (
-                                <>
-                                    {(request.status === 'CREATED' || request.status === 'SEARCHING_FOR_DONORS') && (
-                                        <CancelRequestButton requestId={request.id} onCancel={() => router.push('/dashboard')} />
-                                    )}
-                                    {request.status === 'DONOR_ACCEPTED' && (
-                                        <Button onClick={handleCompleteRequest} size="lg" className="w-full bg-green-600 hover:bg-green-700 shadow-lg shadow-green-200">
-                                            <CheckCircle className="w-5 h-5 mr-2" /> Mark Completed
-                                        </Button>
-                                    )}
-                                </>
-                            ) : (
-                                (request.status === 'CREATED' || request.status === 'SEARCHING_FOR_DONORS') && (
-                                    !acceptedDonors.some(d => d.donor_id === currentUserProfile?.id) ? (
-                                        <Button
-                                            onClick={handleAcceptRequest}
-                                            disabled={accepting}
-                                            size="lg"
-                                            className="w-full text-lg h-14 shadow-xl hover:shadow-2xl bg-gradient-to-r from-red-600 to-brand-red border-none"
-                                        >
-                                            <Heart className={`w-6 h-6 mr-2 ${accepting ? 'animate-pulse' : ''}`} /> {accepting ? 'Processing...' : 'I Can Donate'}
-                                        </Button>
-                                    ) : (
-                                        <Button
-                                            disabled
-                                            size="lg"
-                                            className="w-full text-lg h-14 bg-green-100 text-green-700 border-green-200"
-                                        >
-                                            <CheckCircle className="w-6 h-6 mr-2" /> You are responding
-                                        </Button>
-                                    )
-                                )
-                            )}
-                            <Button variant="outline" size="lg" className="w-full text-gray-600 border-gray-200" onClick={() => navigator.share?.({ title: 'Blood Request', url: window.location.href })}>
-                                <Share2 className="w-5 h-5 mr-2" /> Share Request
-                            </Button>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Sidebar */}
-                    <div className="space-y-6">
-                        {acceptedDonors.length > 0 && (
-                            <Card className="border-green-200 bg-green-50">
-                                <CardHeader>
-                                    <CardTitle className="text-lg flex items-center gap-2 text-green-900">
-                                        <CheckCircle className="w-5 h-5" /> Donors Responding ({acceptedDonors.length})
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <div className="divide-y divide-green-100">
-                                        {acceptedDonors.map((response) => (
-                                            <div key={response.id} className="p-4 hover:bg-green-100/50 transition-colors">
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <p className="font-bold text-gray-900">{response.profiles.full_name}</p>
-                                                    <Badge variant="outline" className="bg-white text-green-700 border-green-200 text-[10px]">
-                                                        {response.status}
-                                                    </Badge>
-                                                </div>
-                                                {isRequester ? (
-                                                    <a href={`tel:${response.profiles.phone}`} className="w-full">
-                                                        <Button size="sm" className="w-full bg-green-600 hover:bg-green-700 text-white shadow-md">
-                                                            <Phone className="w-4 h-4 mr-2" /> Call Donor
-                                                        </Button>
-                                                    </a>
-                                                ) : currentUserProfile?.id === response.donor_id ? (
-                                                    <div className="space-y-2">
-                                                        <p className="text-xs text-green-700">You have offered to help!</p>
-                                                        <a href={`tel:${request.contact_phone}`} className="w-full block">
-                                                            <Button size="sm" variant="outline" className="w-full border-green-600 text-green-700 hover:bg-green-50">
-                                                                <Phone className="w-4 h-4 mr-2" /> Call Requester
-                                                            </Button>
-                                                        </a>
-                                                    </div>
-                                                ) : null}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-                        
-                        {(!isRequester || acceptedDonors.length === 0) && (
-                            isRequester && (
-                                <Card className="border-gray-200 shadow-sm">
-                                    <CardHeader>
-                                        <CardTitle className="text-lg flex items-center gap-2">
-                                            <MapPin className="w-5 h-5 text-brand-red" /> Nearby Match
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="p-0">
-                                        {donors.length > 0 ? (
-                                            <div className="divide-y divide-gray-100">
-                                                {donors.map(donor => (
-                                                    <div key={donor.id} className="p-4 hover:bg-gray-50 transition-colors">
-                                                        <div className="flex justify-between items-start mb-1">
-                                                            <p className="font-bold text-gray-900">{donor.name}</p>
-                                                            <Badge variant="outline" className="text-[10px]">{donor.blood_group}</Badge>
-                                                        </div>
-                                                        <p className="text-xs text-gray-500 mb-2">{donor.distance_km} km away • {donor.city}</p>
-                                                        <Button size="sm" variant="ghost" className="w-full h-8 text-xs text-gray-600 bg-gray-100 border-none">View Profile</Button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="p-8 text-center text-gray-400">
-                                                <div className="animate-spin w-6 h-6 border-2 border-gray-300 border-t-brand-red rounded-full mx-auto mb-2"></div>
-                                                <p className="text-xs">Searching for donors...</p>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            )
-                        )}
+                    {/* Real-time Responses Block */}
+                    {acceptedDonors.length > 0 && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-emerald-500/5 border border-emerald-500/20 rounded-[2rem] p-6 sm:p-8">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                                    <CheckCircle className="w-5 h-5 text-emerald-600" />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-emerald-900 dark:text-emerald-400 tracking-tight">Help is on the way</h2>
+                                    <p className="text-sm font-medium text-emerald-700/70 dark:text-emerald-500/70">{acceptedDonors.length} donor{acceptedDonors.length > 1 ? 's are' : ' is'} responding.</p>
+                                </div>
+                            </div>
 
-                        {/* Blood Bank Fallback */}
-                        {isRequester && bloodBanks.length > 0 && donors.length === 0 && (
-                            <Card className="border-orange-200 bg-orange-50 shadow-sm">
-                                <CardHeader>
-                                    <CardTitle className="text-lg flex items-center gap-2 text-orange-900">
-                                        <AlertCircle className="w-5 h-5" /> Blood Bank Contacts
-                                    </CardTitle>
-                                    <CardDescription className="text-orange-700">
-                                        No individual donors found. Contact these blood banks immediately.
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <div className="divide-y divide-orange-100">
-                                        {bloodBanks.map(bank => (
-                                            <div key={bank.id} className="p-4 hover:bg-orange-100/50 transition-colors">
-                                                <p className="font-bold text-gray-900 mb-1">{bank.name}</p>
-                                                <p className="text-xs text-gray-600 mb-2">{bank.address}</p>
-                                                <a
-                                                    href={`tel:${bank.phone_number}`}
-                                                    className="flex items-center gap-2 text-sm font-semibold text-orange-700 hover:text-orange-900"
-                                                >
-                                                    <Phone className="w-4 h-4" />
-                                                    {bank.phone_number}
+                            <div className="space-y-3">
+                                {acceptedDonors.map((resp) => (
+                                    <div key={resp.id} className="bg-white dark:bg-zinc-900 border border-emerald-500/10 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                                        <div>
+                                            <p className="font-bold text-zinc-900 dark:text-white">{resp.profiles?.full_name || 'A Donor'}</p>
+                                            <p className="text-xs font-medium text-zinc-500">Offered to help</p>
+                                        </div>
+                                        
+                                        {isRequester ? (
+                                            <a href={`tel:${resp.profiles?.phone}`} className="flex-shrink-0">
+                                                <button className="w-full sm:w-auto px-4 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold rounded-xl text-sm flex items-center justify-center transition-transform hover:scale-105 active:scale-95">
+                                                    <Phone className="w-4 h-4 mr-2" />
+                                                    Call Donor
+                                                </button>
+                                            </a>
+                                        ) : currentUserProfile?.id === resp.donor_id ? (
+                                            <div className="flex-shrink-0 text-right">
+                                                <span className="inline-flex items-center px-3 py-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-lg mb-2">
+                                                    This is you
+                                                </span>
+                                                <a href={`tel:${request.contact_phone}`} className="block">
+                                                    <button className="w-full sm:w-auto px-4 py-2 bg-zinc-100 dark:bg-white/5 text-zinc-900 dark:text-white font-bold rounded-xl text-sm flex items-center justify-center transition-colors hover:bg-zinc-200 dark:hover:bg-white/10">
+                                                        <Phone className="w-4 h-4 mr-2" />
+                                                        Call Requester
+                                                    </button>
                                                 </a>
                                             </div>
-                                        ))}
+                                        ) : null}
                                     </div>
-                                </CardContent>
-                            </Card>
-                        )}
+                                ))}
+                            </div>
+                        </motion.div>
+                    )}
 
-                        <div className="p-4 rounded-xl bg-blue-50 border border-blue-100 text-sm text-blue-800">
-                            <h4 className="font-bold flex items-center gap-2 mb-2"><Shield className="w-4 h-4" /> Safety Tip</h4>
-                            <p className="opacity-90 text-xs leading-relaxed">
-                                Always verify the donor's identity and medical history before proceeding with donation at the hospital.
-                            </p>
+                    {/* Action Engine */}
+                    {!isClosed && (
+                        <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                            {!isRequester ? (
+                                !isResponding ? (
+                                    <button
+                                        onClick={handleAcceptRequest}
+                                        disabled={accepting}
+                                        className="flex-1 py-4 bg-crimson text-white text-lg font-bold rounded-2xl flex items-center justify-center shadow-[0_8px_30px_rgba(192,57,43,0.3)] transition-all hover:bg-red-700 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:scale-100"
+                                    >
+                                        {accepting ? (
+                                            <><span className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin mr-3" /> Processing...</>
+                                        ) : (
+                                            <><Heart className="w-5 h-5 mr-2" /> I can help them</>
+                                        )}
+                                    </button>
+                                ) : (
+                                    <button disabled className="flex-1 py-4 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-lg font-bold rounded-2xl flex items-center justify-center">
+                                        <CheckCircle className="w-5 h-5 mr-2" /> You are responding
+                                    </button>
+                                )
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={handleCompleteRequest}
+                                        className="flex-1 py-4 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-base font-bold rounded-2xl flex items-center justify-center shadow-md transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                    >
+                                        <CheckCircle className="w-5 h-5 mr-2" /> Mark as Fulfilled
+                                    </button>
+                                    <button
+                                        onClick={handleCancelRequest}
+                                        className="flex-1 py-4 bg-transparent border-2 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white text-base font-bold rounded-2xl flex items-center justify-center transition-all hover:bg-zinc-100 dark:hover:bg-white/5 hover:border-zinc-300 dark:hover:border-zinc-700"
+                                    >
+                                        Cancel Request
+                                    </button>
+                                </>
+                            )}
+                            
+                            <button 
+                                onClick={() => navigator.share?.({ title: 'Blood Request', url: window.location.href })}
+                                className="px-6 py-4 bg-zinc-100 dark:bg-white/5 text-zinc-900 dark:text-white font-bold rounded-2xl flex items-center justify-center transition-colors hover:bg-zinc-200 dark:hover:bg-white/10"
+                            >
+                                <Share2 className="w-5 h-5 sm:mr-2" />
+                                <span className="hidden sm:inline">Share</span>
+                            </button>
                         </div>
+                    )}
+                    
+                    {/* Safety Notice */}
+                    <div className="flex items-start gap-3 mt-8 p-4 rounded-xl text-xs font-medium text-zinc-500 bg-zinc-100 dark:bg-white/5">
+                        <Shield className="w-4 h-4 shrink-0 text-zinc-400" />
+                        <p>Pulse-Aid does not screen donors or verify medical history. Please coordinate with your medical professional before proceeding with any donations.</p>
                     </div>
 
                 </motion.div>

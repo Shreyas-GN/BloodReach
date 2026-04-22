@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { XCircle } from 'lucide-react';
+import { XCircle, Trash2 } from 'lucide-react';
 import { RequestService } from '@/services/request.service';
 
 interface CancelRequestButtonProps {
@@ -19,7 +19,7 @@ export function CancelRequestButton({ requestId, onCancel }: CancelRequestButton
         setLoading(true);
         setError(null);
         try {
-            await RequestService.updateRequest(requestId.toString(), { status: 'CANCELLED' });
+            await RequestService.updateRequest(requestId.toString(), { status: 'cancelled' });
             
             if (onCancel) {
                 onCancel();
