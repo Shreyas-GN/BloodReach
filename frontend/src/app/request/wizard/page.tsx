@@ -2,19 +2,19 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useApiClient } from '@/lib/useApiClient';
+import { useUser } from '@clerk/nextjs';
+import { RequestService } from '@/services/request.service';
 import { ArrowLeft, ArrowRight, User, Users, HeartPulse, AlertCircle, ShieldAlert, Clock, Droplet, MapPin, Phone, Send } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 
 const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const;
 
 export default function RequestWizardPage() {
     const router = useRouter();
-    const api = useApiClient();
+    const { user } = useUser();
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -28,8 +28,6 @@ export default function RequestWizardPage() {
         hospital_name: '',
         city: '',
         contact_phone: '',
-        hospital_latitude: 0,
-        hospital_longitude: 0,
         note: '',
     });
 
@@ -44,23 +42,29 @@ export default function RequestWizardPage() {
     };
 
     const handleSubmit = async () => {
+        if (!user) {
+            setError("You need to be signed in to request help.");
+            return;
+        }
+
         setLoading(true);
         setError(null);
 
         try {
-            await api.post('requests/', formData);
+            await RequestService.createRequest({
+                requester_id: user.id,
+                patient_name: formData.patient_name,
+                hospital_name: formData.hospital_name,
+                city: formData.city,
+                contact_phone: formData.contact_phone,
+                blood_group: formData.blood_group,
+                units: formData.units,
+                urgency_level: formData.urgency_level,
+                location: 'POINT(0 0)', 
+            });
             router.push('/dashboard');
         } catch (err: any) {
-            const data = err.response?.data;
-            if (data && typeof data === 'object') {
-                // Show first field-level validation error if present
-                const firstError = Object.entries(data)
-                    .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs[0] : msgs}`)
-                    .join(' | ');
-                setError(firstError || 'Failed to create request. Please try again.');
-            } else {
-                setError('Failed to create request. Please try again.');
-            }
+            setError(err.message || "We couldn't submit your request. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -68,38 +72,42 @@ export default function RequestWizardPage() {
 
     const slideVariants = {
         enter: (direction: number) => ({
-            x: direction > 0 ? 300 : -300,
-            opacity: 0
+            x: direction > 0 ? 100 : -100,
+            opacity: 0,
+            scale: 0.98
         }),
         center: {
             x: 0,
-            opacity: 1
+            opacity: 1,
+            scale: 1
         },
         exit: (direction: number) => ({
-            x: direction < 0 ? 300 : -300,
-            opacity: 0
+            x: direction < 0 ? 100 : -100,
+            opacity: 0,
+            scale: 0.98
         })
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-blue-50 flex items-center justify-center p-4">
+        <div className="min-h-[100dvh] bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-4 selection:bg-crimson/30">
             <div className="w-full max-w-2xl">
+                
                 {/* Header */}
                 <div className="text-center mb-8">
-                    <Link href="/dashboard" className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4">
-                        <ArrowLeft className="w-4 h-4 mr-1" />
+                    <Link href="/dashboard" className="inline-flex items-center text-sm font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-white mb-6 transition-colors">
+                        <ArrowLeft className="w-4 h-4 mr-1.5" />
                         Back to Dashboard
                     </Link>
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2">Request Blood</h1>
-                    <p className="text-gray-600">Step {currentStep} of 5</p>
+                    <h1 className="text-3xl font-extrabold text-zinc-900 dark:text-white mb-2 tracking-tight">Request Help</h1>
+                    <p className="text-sm font-medium text-zinc-500">Step {currentStep} of 5</p>
 
                     {/* Progress Bar */}
-                    <div className="mt-4 h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="mt-6 h-1 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden max-w-xs mx-auto">
                         <motion.div
-                            className="h-full bg-brand-red"
+                            className="h-full bg-crimson"
                             initial={{ width: '20%' }}
                             animate={{ width: `${(currentStep / 5) * 100}%` }}
-                            transition={{ duration: 0.3 }}
+                            transition={{ duration: 0.4, ease: "easeOut" }}
                         />
                     </div>
                 </div>
@@ -109,29 +117,23 @@ export default function RequestWizardPage() {
                     <motion.div
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"
+                        className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-700 dark:text-rose-400 text-sm font-medium flex items-center gap-2"
                     >
+                        <AlertCircle className="w-4 h-4 shrink-0" />
                         {error}
                     </motion.div>
                 )}
 
-                {/* Step Content */}
-                <Card className="border-none shadow-2xl">
-                    <CardContent className="p-8">
+                {/* Step Content Card */}
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-white/10 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden">
+                    <div className="p-6 md:p-10 relative min-h-[400px] flex flex-col justify-center">
                         <AnimatePresence mode="wait" custom={currentStep}>
+                            
                             {/* Step 1: Who is it for? */}
                             {currentStep === 1 && (
-                                <motion.div
-                                    key="step1"
-                                    custom={1}
-                                    variants={slideVariants}
-                                    initial="enter"
-                                    animate="center"
-                                    exit="exit"
-                                    transition={{ duration: 0.3 }}
-                                >
-                                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Who needs blood?</h2>
-                                    <p className="text-gray-600 mb-8">Select the relationship to the patient</p>
+                                <motion.div key="step1" custom={1} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.3 }}>
+                                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2 tracking-tight">Who needs blood?</h2>
+                                    <p className="text-zinc-500 dark:text-zinc-400 mb-8 font-medium">Who are you requesting for?</p>
 
                                     <div className="grid grid-cols-2 gap-4">
                                         {[
@@ -141,21 +143,22 @@ export default function RequestWizardPage() {
                                             { value: 'OTHER', label: 'Other', icon: AlertCircle },
                                         ].map((option) => {
                                             const Icon = option.icon;
+                                            const isSelected = formData.requester_relation === option.value;
                                             return (
                                                 <button
                                                     key={option.value}
                                                     onClick={() => {
                                                         setFormData({ ...formData, requester_relation: option.value });
-                                                        setTimeout(handleNext, 200);
+                                                        setTimeout(handleNext, 250);
                                                     }}
-                                                    className={`p-6 rounded-xl border-2 transition-all hover:scale-105 ${formData.requester_relation === option.value
-                                                        ? 'border-brand-red bg-red-50'
-                                                        : 'border-gray-200 hover:border-gray-300'
-                                                        }`}
+                                                    className={`p-6 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-3 ${
+                                                        isSelected
+                                                        ? 'border-crimson bg-rose-500/5 shadow-[0_4px_14px_rgba(192,57,43,0.1)] scale-[1.02]'
+                                                        : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-transparent'
+                                                    }`}
                                                 >
-                                                    <Icon className={`w-8 h-8 mx-auto mb-3 ${formData.requester_relation === option.value ? 'text-brand-red' : 'text-gray-400'
-                                                        }`} />
-                                                    <p className="font-semibold text-gray-900">{option.label}</p>
+                                                    <Icon className={`w-8 h-8 ${isSelected ? 'text-crimson' : 'text-zinc-400 dark:text-zinc-600'}`} />
+                                                    <p className={`font-bold ${isSelected ? 'text-zinc-900 dark:text-white' : 'text-zinc-600 dark:text-zinc-400'}`}>{option.label}</p>
                                                 </button>
                                             );
                                         })}
@@ -165,257 +168,240 @@ export default function RequestWizardPage() {
 
                             {/* Step 2: Urgency */}
                             {currentStep === 2 && (
-                                <motion.div
-                                    key="step2"
-                                    custom={2}
-                                    variants={slideVariants}
-                                    initial="enter"
-                                    animate="center"
-                                    exit="exit"
-                                    transition={{ duration: 0.3 }}
-                                >
-                                    <h2 className="text-2xl font-bold text-gray-900 mb-2">How urgent is it?</h2>
-                                    <p className="text-gray-600 mb-8">Select the urgency level</p>
+                                <motion.div key="step2" custom={2} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.3 }}>
+                                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2 tracking-tight">How fast do you need it?</h2>
+                                    <p className="text-zinc-500 dark:text-zinc-400 mb-8 font-medium">This helps us notify people appropriately.</p>
 
                                     <div className="space-y-4">
                                         {[
-                                            { value: 'IMMEDIATE', label: 'Immediate', desc: 'Within 4 hours', color: 'red', icon: ShieldAlert },
-                                            { value: 'TODAY', label: 'Today', desc: 'Within 24 hours', color: 'orange', icon: Clock },
+                                            { value: 'IMMEDIATE', label: 'Immediate', desc: 'Needed in the next few hours', color: 'rose', icon: ShieldAlert },
+                                            { value: 'TODAY', label: 'Today', desc: 'Needed within 24 hours', color: 'amber', icon: Clock },
                                         ].map((option) => {
                                             const Icon = option.icon;
+                                            const isSelected = formData.urgency_level === option.value;
                                             return (
                                                 <button
                                                     key={option.value}
                                                     onClick={() => {
                                                         setFormData({ ...formData, urgency_level: option.value });
-                                                        setTimeout(handleNext, 200);
+                                                        setTimeout(handleNext, 250);
                                                     }}
-                                                    className={`w-full p-6 rounded-xl border-2 transition-all hover:scale-[1.02] flex items-center ${formData.urgency_level === option.value
-                                                        ? `border-${option.color}-500 bg-${option.color}-50`
-                                                        : 'border-gray-200 hover:border-gray-300'
-                                                        }`}
+                                                    className={`w-full p-6 rounded-2xl border-2 transition-all flex items-center text-left ${
+                                                        isSelected
+                                                        ? `border-${option.color}-500 bg-${option.color}-500/5 shadow-[0_4px_14px_rgba(0,0,0,0.05)] scale-[1.01]`
+                                                        : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-transparent'
+                                                    }`}
                                                 >
-                                                    <Icon className={`w-10 h-10 mr-4 ${formData.urgency_level === option.value ? `text-${option.color}-600` : 'text-gray-400'
-                                                        }`} />
-                                                    <div className="text-left">
-                                                        <p className="font-bold text-lg text-gray-900">{option.label}</p>
-                                                        <p className="text-sm text-gray-600">{option.desc}</p>
+                                                    <div className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center mr-5 ${isSelected ? `bg-${option.color}-500/10` : 'bg-zinc-100 dark:bg-zinc-800'}`}>
+                                                        <Icon className={`w-6 h-6 ${isSelected ? `text-${option.color}-500` : 'text-zinc-400 dark:text-zinc-500'}`} />
+                                                    </div>
+                                                    <div>
+                                                        <p className={`font-extrabold text-lg tracking-tight mb-1 ${isSelected ? 'text-zinc-900 dark:text-white' : 'text-zinc-600 dark:text-zinc-400'}`}>{option.label}</p>
+                                                        <p className="text-sm font-medium text-zinc-500">{option.desc}</p>
                                                     </div>
                                                 </button>
                                             );
                                         })}
                                     </div>
 
-                                    <Button onClick={handleBack} variant="ghost" className="mt-6 w-full">
-                                        <ArrowLeft className="w-4 h-4 mr-2" />
-                                        Back
-                                    </Button>
+                                    <div className="mt-8 flex justify-start">
+                                        <button onClick={handleBack} className="flex items-center text-sm font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors">
+                                            <ArrowLeft className="w-4 h-4 mr-2" />
+                                            Go Back
+                                        </button>
+                                    </div>
                                 </motion.div>
                             )}
 
                             {/* Step 3: Blood Group & Units */}
                             {currentStep === 3 && (
-                                <motion.div
-                                    key="step3"
-                                    custom={3}
-                                    variants={slideVariants}
-                                    initial="enter"
-                                    animate="center"
-                                    exit="exit"
-                                    transition={{ duration: 0.3 }}
-                                >
-                                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Blood Details</h2>
-                                    <p className="text-gray-600 mb-8">Select blood group and units needed</p>
+                                <motion.div key="step3" custom={3} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.3 }} className="h-full flex flex-col">
+                                    <div className="flex-1">
+                                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2 tracking-tight">Blood Requirement</h2>
+                                        <p className="text-zinc-500 dark:text-zinc-400 mb-8 font-medium">Select the specific details.</p>
 
-                                    <div className="space-y-6">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-3">Blood Group</label>
-                                            <div className="grid grid-cols-4 gap-3">
-                                                {bloodGroups.map((group) => (
-                                                    <button
-                                                        key={group}
-                                                        onClick={() => setFormData({ ...formData, blood_group: group })}
-                                                        className={`p-4 rounded-lg border-2 font-bold transition-all hover:scale-105 ${formData.blood_group === group
-                                                            ? 'border-brand-red bg-red-50 text-brand-red'
-                                                            : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                                        <div className="space-y-8">
+                                            <div>
+                                                <label className="block text-sm font-bold text-zinc-900 dark:text-white mb-4">Blood Group</label>
+                                                <div className="grid grid-cols-4 gap-3">
+                                                    {bloodGroups.map((group) => {
+                                                        const isSelected = formData.blood_group === group;
+                                                        return (
+                                                        <button
+                                                            key={group}
+                                                            onClick={() => setFormData({ ...formData, blood_group: group })}
+                                                            className={`p-4 rounded-xl border-2 font-bold font-mono text-lg transition-all ${
+                                                                isSelected
+                                                                ? 'border-crimson bg-rose-500/5 text-crimson scale-[1.05] shadow-sm'
+                                                                : 'border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700'
                                                             }`}
-                                                    >
-                                                        {group}
-                                                    </button>
-                                                ))}
+                                                        >
+                                                            {group}
+                                                        </button>
+                                                    )})}
+                                                </div>
                                             </div>
-                                        </div>
 
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Units Required</label>
-                                            <Input
-                                                type="number"
-                                                min="1"
-                                                max="20"
-                                                value={formData.units}
-                                                onChange={(e) => setFormData({ ...formData, units: parseInt(e.target.value) || 1 })}
-                                                className="text-lg font-semibold"
-                                            />
+                                            <div>
+                                                <label className="block text-sm font-bold text-zinc-900 dark:text-white mb-4">Units Required</label>
+                                                <Input
+                                                    type="number"
+                                                    min="1"
+                                                    max="20"
+                                                    value={formData.units}
+                                                    onChange={(e) => setFormData({ ...formData, units: parseInt(e.target.value) || 1 })}
+                                                    className="text-lg font-bold h-14 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-800 rounded-xl px-4"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div className="flex gap-3 mt-8">
-                                        <Button onClick={handleBack} variant="outline" className="flex-1">
+                                    <div className="flex items-center justify-between gap-4 mt-8 pt-6 border-t border-zinc-200 dark:border-white/10">
+                                        <button onClick={handleBack} className="flex items-center text-sm font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors">
                                             <ArrowLeft className="w-4 h-4 mr-2" />
                                             Back
-                                        </Button>
-                                        <Button
+                                        </button>
+                                        <button
                                             onClick={handleNext}
                                             disabled={!formData.blood_group}
-                                            className="flex-1"
+                                            className="px-8 py-3.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold rounded-xl flex items-center justify-center shadow-md disabled:opacity-50 transition-all hover:scale-[1.02] active:scale-[0.98]"
                                         >
-                                            Next
+                                            Next Step
                                             <ArrowRight className="w-4 h-4 ml-2" />
-                                        </Button>
+                                        </button>
                                     </div>
                                 </motion.div>
                             )}
 
-                            {/* Step 4: Patient & Hospital Details */}
+                            {/* Step 4: Patient details */}
                             {currentStep === 4 && (
-                                <motion.div
-                                    key="step4"
-                                    custom={4}
-                                    variants={slideVariants}
-                                    initial="enter"
-                                    animate="center"
-                                    exit="exit"
-                                    transition={{ duration: 0.3 }}
-                                >
-                                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Patient Details</h2>
-                                    <p className="text-gray-600 mb-8">Enter patient and hospital information</p>
+                                <motion.div key="step4" custom={4} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.3 }} className="h-full flex flex-col">
+                                    <div className="flex-1">
+                                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2 tracking-tight">Location & Contact</h2>
+                                        <p className="text-zinc-500 dark:text-zinc-400 mb-8 font-medium">Where should donors go?</p>
 
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Patient Name</label>
-                                            <Input
-                                                type="text"
-                                                placeholder="Full name"
-                                                value={formData.patient_name}
-                                                onChange={(e) => setFormData({ ...formData, patient_name: e.target.value })}
-                                            />
-                                        </div>
+                                        <div className="space-y-5">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                <div>
+                                                    <label className="block text-sm font-bold text-zinc-900 dark:text-white mb-2">Patient's Full Name</label>
+                                                    <Input
+                                                        type="text"
+                                                        placeholder="Sarah Jenkins"
+                                                        value={formData.patient_name}
+                                                        onChange={(e) => setFormData({ ...formData, patient_name: e.target.value })}
+                                                        className="h-12 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-800 rounded-xl"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-bold text-zinc-900 dark:text-white mb-2">Your Phone Number</label>
+                                                    <Input
+                                                        type="tel"
+                                                        placeholder="10-digit number"
+                                                        value={formData.contact_phone}
+                                                        onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+                                                        className="h-12 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-800 rounded-xl"
+                                                    />
+                                                </div>
+                                            </div>
 
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Hospital Name</label>
-                                            <Input
-                                                type="text"
-                                                placeholder="Hospital name"
-                                                value={formData.hospital_name}
-                                                onChange={(e) => setFormData({ ...formData, hospital_name: e.target.value })}
-                                            />
-                                        </div>
+                                            <div>
+                                                <label className="block text-sm font-bold text-zinc-900 dark:text-white mb-2">Hospital Name</label>
+                                                <Input
+                                                    type="text"
+                                                    placeholder="City Hospital, Emergency Ward"
+                                                    value={formData.hospital_name}
+                                                    onChange={(e) => setFormData({ ...formData, hospital_name: e.target.value })}
+                                                    className="h-12 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-800 rounded-xl"
+                                                />
+                                            </div>
 
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
-                                            <Input
-                                                type="text"
-                                                placeholder="City"
-                                                value={formData.city}
-                                                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Contact Phone</label>
-                                            <Input
-                                                type="tel"
-                                                placeholder="10-digit phone number"
-                                                value={formData.contact_phone}
-                                                onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-                                            />
+                                            <div>
+                                                <label className="block text-sm font-bold text-zinc-900 dark:text-white mb-2">City</label>
+                                                <Input
+                                                    type="text"
+                                                    placeholder="e.g. Bangalore"
+                                                    value={formData.city}
+                                                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                                                    className="h-12 bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-800 rounded-xl"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div className="flex gap-3 mt-8">
-                                        <Button onClick={handleBack} variant="outline" className="flex-1">
+                                    <div className="flex items-center justify-between gap-4 mt-8 pt-6 border-t border-zinc-200 dark:border-white/10">
+                                        <button onClick={handleBack} className="flex items-center text-sm font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors">
                                             <ArrowLeft className="w-4 h-4 mr-2" />
                                             Back
-                                        </Button>
-                                        <Button
+                                        </button>
+                                        <button
                                             onClick={handleNext}
                                             disabled={!formData.patient_name || !formData.hospital_name || !formData.city || !formData.contact_phone}
-                                            className="flex-1"
+                                            className="px-8 py-3.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold rounded-xl flex items-center justify-center shadow-md disabled:opacity-50 transition-all hover:scale-[1.02] active:scale-[0.98]"
                                         >
-                                            Next
+                                            Review Details
                                             <ArrowRight className="w-4 h-4 ml-2" />
-                                        </Button>
+                                        </button>
                                     </div>
                                 </motion.div>
                             )}
 
                             {/* Step 5: Review & Submit */}
                             {currentStep === 5 && (
-                                <motion.div
-                                    key="step5"
-                                    custom={5}
-                                    variants={slideVariants}
-                                    initial="enter"
-                                    animate="center"
-                                    exit="exit"
-                                    transition={{ duration: 0.3 }}
-                                >
-                                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Review Request</h2>
-                                    <p className="text-gray-600 mb-8">Confirm your blood request details</p>
+                                <motion.div key="step5" custom={5} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.3 }} className="h-full flex flex-col">
+                                    <div className="flex-1">
+                                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2 tracking-tight">Before we send this out</h2>
+                                        <p className="text-zinc-500 dark:text-zinc-400 mb-8 font-medium">Please verify the details below are correct.</p>
 
-                                    <div className="space-y-4 bg-gray-50 p-6 rounded-xl">
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-600">Blood Group:</span>
-                                            <span className="font-bold text-brand-red text-lg">{formData.blood_group}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-600">Units:</span>
-                                            <span className="font-semibold">{formData.units}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-600">Urgency:</span>
-                                            <span className={`font-semibold ${formData.urgency_level === 'IMMEDIATE' ? 'text-red-600' : 'text-orange-600'}`}>
-                                                {formData.urgency_level}
-                                            </span>
-                                        </div>
-                                        <hr className="border-gray-200" />
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-600">Patient:</span>
-                                            <span className="font-semibold">{formData.patient_name}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-600">Hospital:</span>
-                                            <span className="font-semibold">{formData.hospital_name}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-600">City:</span>
-                                            <span className="font-semibold">{formData.city}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-600">Contact:</span>
-                                            <span className="font-semibold">{formData.contact_phone}</span>
+                                        <div className="space-y-4 bg-zinc-50 dark:bg-zinc-800/30 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                                            <div className="flex justify-between items-center bg-white dark:bg-zinc-900 p-4 rounded-xl shadow-sm border border-zinc-100 dark:border-zinc-800">
+                                                <span className="text-zinc-500 font-medium text-sm">Requirement</span>
+                                                <span className="font-extrabold text-crimson font-mono text-lg">{formData.blood_group} • {formData.units} Unit(s)</span>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-2 gap-4 px-2">
+                                                <div className="space-y-1">
+                                                    <span className="text-zinc-500 text-xs font-semibold uppercase tracking-wider block">Urgency</span>
+                                                    <span className="font-bold text-zinc-900 dark:text-white">{formData.urgency_level === 'IMMEDIATE' ? 'Next few hours' : 'Within 24 hours'}</span>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <span className="text-zinc-500 text-xs font-semibold uppercase tracking-wider block">Patient</span>
+                                                    <span className="font-bold text-zinc-900 dark:text-white">{formData.patient_name}</span>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <span className="text-zinc-500 text-xs font-semibold uppercase tracking-wider block">Hospital</span>
+                                                    <span className="font-bold text-zinc-900 dark:text-white">{formData.hospital_name}</span>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <span className="text-zinc-500 text-xs font-semibold uppercase tracking-wider block">Contact</span>
+                                                    <span className="font-bold text-zinc-900 dark:text-white">{formData.contact_phone}</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div className="flex gap-3 mt-8">
-                                        <Button onClick={handleBack} variant="outline" className="flex-1">
+                                    <div className="flex items-center justify-between gap-4 mt-8 pt-6 border-t border-zinc-200 dark:border-white/10">
+                                        <button onClick={handleBack} className="flex items-center text-sm font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors">
                                             <ArrowLeft className="w-4 h-4 mr-2" />
                                             Back
-                                        </Button>
-                                        <Button
+                                        </button>
+                                        <button
                                             onClick={handleSubmit}
                                             disabled={loading}
-                                            className="flex-1 bg-brand-red hover:bg-red-700"
+                                            className="px-8 py-3.5 bg-crimson text-white font-bold rounded-xl flex items-center justify-center shadow-[0_4px_14px_rgba(192,57,43,0.3)] disabled:opacity-50 transition-all hover:bg-red-700 hover:scale-[1.02] active:scale-[0.98]"
                                         >
-                                            {loading ? 'Submitting...' : 'Submit Request'}
-                                            <Send className="w-4 h-4 ml-2" />
-                                        </Button>
+                                            {loading ? (
+                                                <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin mr-2" /> Sending...</>
+                                            ) : (
+                                                <>Find a donor now <Send className="w-4 h-4 ml-2" /></>
+                                            )}
+                                        </button>
                                     </div>
                                 </motion.div>
                             )}
+
                         </AnimatePresence>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
             </div>
         </div>
     );

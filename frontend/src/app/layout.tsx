@@ -17,6 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Pulse Aid - Emergency Blood, Handled Calmly",
   description: "Bridging the gap between donors and those in need. Simple, fast, and trusted.",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({

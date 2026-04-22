@@ -3,16 +3,15 @@
 import { useUser } from "@clerk/nextjs";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useApiClient } from "@/lib/useApiClient";
+import { RequestService } from "@/services/request.service";
+import { DonorService } from "@/services/donor.service";
 import {
-    AlertCircle, Droplet, MapPin, Clock, Heart,
-    TrendingUp, Plus, Settings, CheckCircle2, Zap,
+    AlertCircle, Droplet, MapPin, Clock, Heart, Activity,
+    TrendingUp, Plus, Settings, CheckCircle2, Zap, ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/Button";
-import { Card, CardContent } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import { DonorAvailabilityToggle } from "@/components/DonorAvailabilityToggle";
 import { NotificationBell } from "@/components/NotificationBell";
 import type { BloodRequest, User } from "@/types";
@@ -20,27 +19,30 @@ import type { BloodRequest, User } from "@/types";
 type Tab = "donate" | "mine";
 
 const URGENCY_COLOR: Record<string, string> = {
-    IMMEDIATE: "bg-red-500",
-    TODAY: "bg-orange-500",
-    SCHEDULED: "bg-blue-500",
+    IMMEDIATE: "bg-rose-500 text-white border-rose-500",
+    TODAY: "bg-amber-500 text-zinc-900 border-amber-500",
+    SCHEDULED: "bg-blue-500 text-white border-blue-500",
 };
 
-const STATUS_BADGE: Record<string, "info" | "warning" | "success" | "danger" | "default"> = {
-    CREATED: "info",
-    SEARCHING_FOR_DONORS: "warning",
-    DONOR_ACCEPTED: "success",
-    COMPLETED: "default",
-    CANCELLED: "danger",
+const STATUS_BADGE: Record<string, { bg: string, text: string }> = {
+    CREATED: { bg: "bg-zinc-100 dark:bg-white/10", text: "text-zinc-600 dark:text-zinc-300" },
+    SEARCHING_FOR_DONORS: { bg: "bg-amber-500/10", text: "text-amber-700 dark:text-amber-400" },
+    DONOR_ACCEPTED: { bg: "bg-emerald-500/10", text: "text-emerald-700 dark:text-emerald-400" },
+    COMPLETED: { bg: "bg-zinc-100 dark:bg-white/10", text: "text-zinc-600 dark:text-zinc-400" },
+    CANCELLED: { bg: "bg-rose-500/10", text: "text-rose-700 dark:text-rose-400" },
 };
 
-function UrgencyBar({ level }: { level: string }) {
-    return <div className={`h-1 w-full ${URGENCY_COLOR[level] ?? "bg-gray-300"}`} />;
-}
+const STATUS_LABEL: Record<string, string> = {
+    CREATED: "Created",
+    SEARCHING_FOR_DONORS: "Looking for donors",
+    DONOR_ACCEPTED: "Donor found",
+    COMPLETED: "Completed",
+    CANCELLED: "Cancelled",
+};
 
 export default function DashboardPage() {
     const { user, isLoaded } = useUser();
     const router = useRouter();
-    const api = useApiClient();
 
     const [profile, setProfile] = useState<User | null>(null);
     const [allRequests, setAllRequests] = useState<BloodRequest[]>([]);
@@ -50,19 +52,20 @@ export default function DashboardPage() {
     const [acceptedIds, setAcceptedIds] = useState<Set<number>>(new Set());
 
     const fetchData = useCallback(async () => {
+        if (!user?.id) return;
         try {
-            const [profileRes, requestsRes] = await Promise.all([
-                api.get<User>("users/profile/"),
-                api.get<BloodRequest[]>("requests/"),
+            const [profileData, requestsData] = await Promise.all([
+                DonorService.getProfile(user.id).catch(() => null),
+                RequestService.getActiveRequests().catch(() => []), 
             ]);
-            setProfile(profileRes.data);
-            setAllRequests(requestsRes.data);
+            setProfile(profileData as any);
+            setAllRequests(requestsData as any);
         } catch {
-            // handled silently — user sees empty state
+            // Logged silently
         } finally {
             setLoading(false);
         }
-    }, [api]);
+    }, [user?.id]);
 
     useEffect(() => {
         if (!isLoaded) return;
@@ -70,15 +73,14 @@ export default function DashboardPage() {
         fetchData();
     }, [isLoaded, user, fetchData, router]);
 
-    const handleAccept = async (requestId: number) => {
+    const handleAccept = async (requestId: any) => {
         setAcceptingId(requestId);
         try {
-            await api.post(`requests/${requestId}/accept/`);
+            await RequestService.updateRequest(requestId, { status: 'fulfilled' });
             setAcceptedIds((prev) => new Set(prev).add(requestId));
             await fetchData();
         } catch (err: any) {
-            const msg = err.response?.data?.error ?? "Could not accept request. Try again.";
-            alert(msg);
+            alert(err.message || "We encountered an issue updating this. Please try again.");
         } finally {
             setAcceptingId(null);
         }
@@ -86,18 +88,18 @@ export default function DashboardPage() {
 
     if (!isLoaded || loading) {
         return (
-            <div className="h-screen flex items-center justify-center bg-gray-50">
-                <div className="flex flex-col items-center gap-3">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-red" />
-                    <p className="text-gray-500 text-sm font-medium animate-pulse">Loading Dashboard...</p>
+            <div className="min-h-[100dvh] flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-12 h-12 relative flex items-center justify-center">
+                        <div className="absolute inset-0 rounded-full border-2 border-zinc-200 dark:border-zinc-800" />
+                        <div className="absolute inset-0 rounded-full border-2 border-crimson border-t-transparent animate-spin" />
+                    </div>
                 </div>
             </div>
         );
     }
 
     const myRequests = allRequests.filter((r) => r.requester_id === (profile?.id ?? -1));
-
-    // Requests from others that match the user's blood group and are still searching
     const donateRequests = allRequests.filter(
         (r) =>
             r.requester_id !== (profile?.id ?? -1) &&
@@ -105,128 +107,121 @@ export default function DashboardPage() {
             (r.status === "SEARCHING_FOR_DONORS" || r.status === "CREATED")
     );
 
-    const timeOfDay =
-        new Date().getHours() < 12
-            ? "Good morning"
-            : new Date().getHours() < 18
-                ? "Good afternoon"
-                : "Good evening";
-    const displayName = user?.firstName ?? user?.username ?? "Donor";
+    const displayName = user?.firstName ?? user?.username ?? "There";
 
     return (
-        <div className="min-h-screen bg-gray-50/50">
-            {/* Header */}
-            <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
-                <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-                    <Link href="/" className="flex items-center gap-2">
-                        <Droplet className="w-6 h-6 text-brand-red" />
-                        <span className="text-xl font-bold">
-                            <span className="text-brand-red">Pulse</span>
-                            <span className="text-brand-blue">Aid</span>
-                        </span>
+        <div className="min-h-[100dvh] bg-zinc-50 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-zinc-50 selection:bg-crimson/30 pb-safe">
+            {/* Nav Header */}
+            <header className="sticky top-0 z-50 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-xl border-b border-zinc-200/50 dark:border-white/10">
+                <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+                    <Link href="/" className="flex items-center gap-2 outline-none group">
+                        <motion.div
+                            whileHover={{ rotate: 180, scale: 1.1 }}
+                            transition={{ type: "spring", stiffness: 100, damping: 20 }}
+                            className="bg-rose-600/10 p-1.5 rounded-xl"
+                        >
+                            <Droplet className="w-5 h-5 fill-crimson stroke-crimson" />
+                        </motion.div>
+                        <span className="text-[17px] font-bold tracking-tight">PulseAid</span>
                     </Link>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-4">
                         <NotificationBell />
                         <Link href="/settings">
-                            <Button variant="ghost" size="sm" className="w-9 h-9 rounded-full p-0 text-gray-500">
-                                <Settings className="w-5 h-5" />
-                            </Button>
+                            <motion.button 
+                                whileHover={{ scale: 0.95 }}
+                                whileTap={{ scale: 0.9 }}
+                                className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-white/5 flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                            >
+                                <Settings className="w-4 h-4" />
+                            </motion.button>
                         </Link>
                     </div>
                 </nav>
             </header>
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-                {/* Welcome row */}
+            <main className="max-w-7xl mx-auto px-6 py-10 space-y-12">
+                
+                {/* Hero / Pulse Identity */}
                 <motion.div
-                    initial={{ opacity: 0, y: 16 }}
+                    initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+                    className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-zinc-200/50 dark:border-white/10 pb-8"
                 >
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">
-                            {timeOfDay}, {displayName} 👋
+                    <div className="space-y-2">
+                        <h1 className="text-4xl font-extrabold tracking-tighter text-zinc-900 dark:text-white">
+                            Good morning, {displayName}.
                         </h1>
-                        <p className="text-gray-500 mt-1 text-sm">
-                            {profile?.blood_group
-                                ? `You're a ${profile.blood_group} donor — ${donateRequests.length} request${donateRequests.length !== 1 ? "s" : ""} waiting for you`
-                                : "Complete your profile to start donating"}
+                        <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+                            Here's what's happening near you.
                         </p>
                     </div>
                     <Link href="/request/wizard">
-                        <Button size="lg" className="shadow-lg shadow-brand-red/20">
-                            <Plus className="w-5 h-5 mr-2" />
-                            Request Blood
-                        </Button>
+                        <motion.button 
+                            whileHover={{ scale: 0.98 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="flex items-center gap-2 bg-crimson hover:bg-red-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-[0_4px_14px_0_rgba(192,57,43,0.3)] transition-all"
+                        >
+                            <AlertCircle className="w-4 h-4" />
+                            Request blood for someone
+                        </motion.button>
                     </Link>
                 </motion.div>
 
-                {/* Stats row */}
+                {/* Data Telemetry Grid (Bento) -> Situational Stats Grid */}
                 <motion.div
-                    initial={{ opacity: 0, y: 16 }}
+                    initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.05 }}
-                    className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+                    transition={{ delay: 0.1 }}
+                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
                 >
-                    <Card className="border-gray-100 shadow-sm">
-                        <CardContent className="p-5 flex items-center gap-4">
-                            <div className="w-11 h-11 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                                <Droplet className="w-5 h-5 text-brand-red" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold text-gray-900">{profile?.blood_group ?? "—"}</p>
-                                <p className="text-xs text-gray-500">Blood Group</p>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <div className="bg-white dark:bg-white/5 border border-zinc-200/50 dark:border-white/10 rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+                        <div className="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center mb-4">
+                            <Droplet className="w-5 h-5 text-crimson" />
+                        </div>
+                        <p className="text-3xl font-extrabold tracking-tight font-mono text-zinc-900 dark:text-white mb-1">
+                            {profile?.blood_group ?? "Not set"}
+                        </p>
+                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Your blood group</p>
+                    </div>
 
-                    <Card className="border-gray-100 shadow-sm">
-                        <CardContent className="p-5 flex items-center gap-4">
-                            <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${profile?.is_available_donor ? "bg-green-50" : "bg-gray-100"}`}>
-                                <Heart className={`w-5 h-5 ${profile?.is_available_donor ? "text-green-600" : "text-gray-400"}`} />
-                            </div>
-                            <div>
-                                <p className="text-sm font-bold text-gray-900">
-                                    {profile?.is_available_donor ? "Available" : "Away"}
-                                </p>
-                                <p className="text-xs text-gray-500">Donor Status</p>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <div className="bg-white dark:bg-white/5 border border-zinc-200/50 dark:border-white/10 rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-4 ${profile?.is_available_donor ? 'bg-emerald-500/10' : 'bg-zinc-500/10'}`}>
+                            <Heart className={`w-5 h-5 ${profile?.is_available_donor ? 'text-emerald-600' : 'text-zinc-500'}`} />
+                        </div>
+                        <p className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white mb-1">
+                            {profile?.is_available_donor ? "Available to help" : "Not available right now"}
+                        </p>
+                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Status</p>
+                    </div>
 
-                    <Card className="border-gray-100 shadow-sm">
-                        <CardContent className="p-5 flex items-center gap-4">
-                            <div className="w-11 h-11 bg-orange-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                                <Zap className="w-5 h-5 text-orange-500" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold text-gray-900">{donateRequests.length}</p>
-                                <p className="text-xs text-gray-500">Needs Your Blood</p>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <div className="bg-white dark:bg-white/5 border border-zinc-200/50 dark:border-white/10 rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                        {donateRequests.length > 0 && (
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-3xl rounded-full" />
+                        )}
+                        <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center mb-4">
+                            <Zap className="w-5 h-5 text-amber-600" />
+                        </div>
+                        <p className="text-3xl font-extrabold tracking-tight font-mono text-zinc-900 dark:text-white mb-1">
+                            {donateRequests.length}
+                        </p>
+                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Requests near you</p>
+                    </div>
 
-                    <Card className="border-gray-100 shadow-sm">
-                        <CardContent className="p-5 flex items-center gap-4">
-                            <div className="w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                                <TrendingUp className="w-5 h-5 text-blue-600" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold text-gray-900">{myRequests.length}</p>
-                                <p className="text-xs text-gray-500">My Requests</p>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <div className="bg-white dark:bg-white/5 border border-zinc-200/50 dark:border-white/10 rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+                        <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
+                            <TrendingUp className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <p className="text-3xl font-extrabold tracking-tight font-mono text-zinc-900 dark:text-white mb-1">
+                            {myRequests.length}
+                        </p>
+                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Requests you made</p>
+                    </div>
                 </motion.div>
 
-                {/* Availability Toggle */}
+                {/* Router Toggle */}
                 {profile && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 16 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1 }}
-                    >
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
                         <DonorAvailabilityToggle
                             initialAvailable={profile.is_available_donor ?? false}
                             onToggle={() => fetchData()}
@@ -234,211 +229,180 @@ export default function DashboardPage() {
                     </motion.div>
                 )}
 
-                {/* Tabs */}
-                <motion.div
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.15 }}
-                >
-                    <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit mb-6">
+                {/* Data Views */}
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="space-y-6">
+                    
+                    {/* View Switcher Engine */}
+                    <div className="flex gap-2 p-1.5 bg-zinc-200/50 dark:bg-white/5 rounded-2xl w-fit">
                         <button
                             onClick={() => setTab("donate")}
-                            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${tab === "donate"
-                                ? "bg-white text-brand-red shadow-sm"
-                                : "text-gray-500 hover:text-gray-700"
-                                }`}
+                            className={`relative px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${tab === "donate" ? "text-zinc-900 dark:text-white" : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"}`}
                         >
-                            🩸 Donate Blood
+                            {tab === "donate" && (
+                                <motion.div layoutId="activeTab" className="absolute inset-0 bg-white dark:bg-zinc-800 shadow-sm rounded-xl -z-10" />
+                            )}
+                            Who needs help
                             {donateRequests.length > 0 && (
-                                <span className="ml-2 bg-red-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5">
+                                <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 rounded-md bg-crimson text-[10px] text-white">
                                     {donateRequests.length}
                                 </span>
                             )}
                         </button>
                         <button
                             onClick={() => setTab("mine")}
-                            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${tab === "mine"
-                                ? "bg-white text-brand-blue shadow-sm"
-                                : "text-gray-500 hover:text-gray-700"
-                                }`}
+                            className={`relative px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${tab === "mine" ? "text-zinc-900 dark:text-white" : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"}`}
                         >
-                            📋 My Requests
+                            {tab === "mine" && (
+                                <motion.div layoutId="activeTab" className="absolute inset-0 bg-white dark:bg-zinc-800 shadow-sm rounded-xl -z-10" />
+                            )}
+                            Requests I made
                         </button>
                     </div>
 
                     <AnimatePresence mode="wait">
                         {tab === "donate" ? (
-                            <motion.div
-                                key="donate"
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: 20 }}
-                                transition={{ duration: 0.2 }}
-                            >
+                            <motion.div key="donate" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="min-h-[300px]">
                                 {!profile?.blood_group ? (
-                                    <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-10 text-center">
-                                        <p className="text-gray-500 text-sm">
-                                            Complete your profile to see matching requests.
-                                        </p>
-                                        <Link href="/onboarding" className="mt-3 inline-block">
-                                            <Button variant="outline" size="sm">Complete Profile</Button>
+                                    <div className="flex flex-col items-center justify-center p-12 text-center bg-white dark:bg-white/5 border border-dashed border-zinc-200 dark:border-white/10 rounded-3xl">
+                                        <div className="p-4 bg-zinc-100 dark:bg-white/5 rounded-2xl mb-4">
+                                            <Settings className="w-6 h-6 text-zinc-400" />
+                                        </div>
+                                        <p className="text-zinc-900 dark:text-white font-bold mb-1">You haven't set your blood group yet</p>
+                                        <p className="text-sm text-zinc-500 mb-6 max-w-sm">Add it now so we can show you relevant requests near you.</p>
+                                        <Link href="/onboarding">
+                                            <Button variant="outline" className="rounded-xl border-zinc-200 dark:border-zinc-800">Set Blood Group</Button>
                                         </Link>
                                     </div>
                                 ) : !profile.is_available_donor ? (
-                                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center">
-                                        <Heart className="w-10 h-10 text-amber-400 mx-auto mb-3" />
-                                        <p className="font-semibold text-amber-800">You&apos;re currently set as unavailable</p>
-                                        <p className="text-sm text-amber-600 mt-1">Toggle your availability above to start accepting requests.</p>
+                                    <div className="flex flex-col items-center justify-center p-12 text-center bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-3xl">
+                                        <ShieldCheck className="w-8 h-8 text-zinc-400 mb-4" />
+                                        <p className="text-zinc-900 dark:text-white font-bold mb-1">You've turned off availability</p>
+                                        <p className="text-sm text-zinc-500 max-w-sm">Requests near you won't reach you while this is off. Turn it back on when you're ready.</p>
                                     </div>
                                 ) : donateRequests.length === 0 ? (
-                                    <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-10 text-center">
-                                        <CheckCircle2 className="w-12 h-12 text-green-400 mx-auto mb-3" />
-                                        <h3 className="font-bold text-gray-800">All clear!</h3>
-                                        <p className="text-gray-500 text-sm mt-1">
-                                            No active requests for {profile.blood_group} blood in your area right now.
-                                        </p>
+                                    <div className="flex flex-col items-center justify-center p-12 text-center bg-emerald-500/5 border border-emerald-500/20 rounded-3xl">
+                                        <CheckCircle2 className="w-8 h-8 text-emerald-600 mb-4" />
+                                        <p className="text-emerald-900 dark:text-emerald-400 font-bold mb-1">No matching requests right now</p>
+                                        <p className="text-sm text-emerald-700/70 dark:text-emerald-500/70 max-w-sm">You're set up to help. You'll get a notification when someone near you needs {profile.blood_group}.</p>
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                         {donateRequests.map((req, i) => (
-                                            <motion.div
-                                                key={req.id}
-                                                initial={{ opacity: 0, y: 12 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                transition={{ delay: i * 0.07 }}
-                                            >
-                                                <Card className="h-full border-gray-100 overflow-hidden hover:shadow-xl transition-shadow">
-                                                    <UrgencyBar level={req.urgency_level} />
-                                                    <CardContent className="p-5 flex flex-col h-full">
-                                                        {/* Blood group badge + urgency */}
-                                                        <div className="flex items-start justify-between mb-4">
-                                                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-extrabold text-white text-xl shadow-lg ${URGENCY_COLOR[req.urgency_level] ?? "bg-gray-400"}`}>
-                                                                {req.blood_group}
-                                                            </div>
-                                                            {req.urgency_level === "IMMEDIATE" && (
-                                                                <span className="flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-1 rounded-full animate-pulse">
-                                                                    <AlertCircle className="w-3 h-3" /> URGENT
-                                                                </span>
-                                                            )}
+                                            <motion.div key={req.id} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }} className="group relative">
+                                                <div className="absolute inset-0 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200/50 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] pointer-events-none" />
+                                                <div className="relative p-6 flex flex-col h-full">
+                                                    
+                                                    {/* Header Status Phase */}
+                                                    <div className="flex items-start justify-between mb-6">
+                                                        <div className={`px-3 py-1.5 rounded-lg border text-sm font-bold tracking-tight ${URGENCY_COLOR[req.urgency_level] ?? "bg-zinc-100 text-zinc-900"}`}>
+                                                            {req.blood_group} needed
                                                         </div>
-
-                                                        <h3 className="font-bold text-gray-900">{req.patient_name}</h3>
-                                                        <p className="text-sm text-gray-500 mt-0.5 truncate">{req.hospital_name}</p>
-
-                                                        <div className="mt-3 space-y-1.5 text-sm text-gray-600 flex-1">
-                                                            <div className="flex items-center gap-2">
-                                                                <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                                                                <span>{req.city}</span>
+                                                        {req.urgency_level === "IMMEDIATE" && (
+                                                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-rose-600 uppercase tracking-widest animate-pulse">
+                                                                <div className="w-1.5 h-1.5 rounded-full bg-rose-600" />
+                                                                Needed in the next few hours
                                                             </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <Droplet className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                                                                <span>{req.units} unit{req.units !== 1 ? "s" : ""} needed</span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Facility Data Block */}
+                                                    <div className="mb-6 flex-1">
+                                                        <h3 className="font-extrabold text-xl tracking-tight text-zinc-900 dark:text-white mb-2">{req.patient_name}</h3>
+                                                        <div className="space-y-2">
+                                                            <div className="flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
+                                                                <div className="w-6 flex justify-center"><MapPin className="w-4 h-4" /></div>
+                                                                <span className="font-medium truncate">{req.hospital_name}, {req.city}</span>
                                                             </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                                                                <span>{new Date(req.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                                                            <div className="flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
+                                                                <div className="w-6 flex justify-center"><Droplet className="w-4 h-4" /></div>
+                                                                <span className="font-medium">{req.units} unit(s)</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
+                                                                <div className="w-6 flex justify-center"><Clock className="w-4 h-4" /></div>
+                                                                <span className="font-medium font-mono">Posted at {new Date(req.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                                                             </div>
                                                         </div>
+                                                    </div>
 
-                                                        {/* Accept button — the Uber moment */}
-                                                        <button
-                                                            onClick={() => handleAccept(req.id)}
-                                                            disabled={acceptingId === req.id || acceptedIds.has(req.id)}
-                                                            className={`mt-5 w-full py-3 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-all active:scale-95 ${acceptedIds.has(req.id)
-                                                                ? "bg-green-500 cursor-default"
-                                                                : "bg-brand-red hover:bg-red-700 shadow-lg shadow-brand-red/30 hover:shadow-brand-red/50"
-                                                                } disabled:opacity-60`}
-                                                        >
-                                                            {acceptedIds.has(req.id) ? (
-                                                                <>
-                                                                    <CheckCircle2 className="w-5 h-5" /> Accepted!
-                                                                </>
-                                                            ) : acceptingId === req.id ? (
-                                                                <>
-                                                                    <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                                                                    Accepting...
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <Heart className="w-5 h-5" /> I Can Donate
-                                                                </>
-                                                            )}
-                                                        </button>
-                                                    </CardContent>
-                                                </Card>
+                                                    {/* Execution Engine */}
+                                                    <motion.button
+                                                        whileHover={{ scale: 0.98 }}
+                                                        whileTap={{ scale: 0.95 }}
+                                                        onClick={() => handleAccept(req.id)}
+                                                        disabled={acceptingId === req.id || acceptedIds.has(req.id)}
+                                                        className={`w-full py-3.5 rounded-2xl font-bold text-sm tracking-tight flex items-center justify-center gap-2 transition-all ${
+                                                            acceptedIds.has(req.id)
+                                                                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 cursor-not-allowed border border-emerald-500/20"
+                                                                : "bg-zinc-900 dark:bg-white text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 shadow-[0_4px_14px_0_rgba(0,0,0,0.1)] dark:shadow-[0_4px_14px_0_rgba(255,255,255,0.05)]"
+                                                        } disabled:opacity-50`}
+                                                    >
+                                                        {acceptedIds.has(req.id) ? (
+                                                            <>
+                                                                <CheckCircle2 className="w-4 h-4" /> You're helping
+                                                            </>
+                                                        ) : acceptingId === req.id ? (
+                                                            <>
+                                                                <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                                                                Confirming...
+                                                            </>
+                                                        ) : (
+                                                            <>I can help</>
+                                                        )}
+                                                    </motion.button>
+                                                </div>
                                             </motion.div>
                                         ))}
                                     </div>
                                 )}
                             </motion.div>
                         ) : (
-                            <motion.div
-                                key="mine"
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -20 }}
-                                transition={{ duration: 0.2 }}
-                            >
+                            <motion.div key="mine" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="min-h-[300px]">
                                 {myRequests.length === 0 ? (
-                                    <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-10 text-center">
-                                        <h3 className="font-bold text-gray-800 mb-2">No requests yet</h3>
-                                        <p className="text-gray-500 text-sm mb-5">Need blood urgently? Create a request and get matched in seconds.</p>
+                                    <div className="flex flex-col items-center justify-center p-12 text-center bg-white dark:bg-white/5 border border-dashed border-zinc-200 dark:border-white/10 rounded-3xl">
+                                        <div className="p-4 bg-zinc-100 dark:bg-white/5 rounded-2xl mb-4">
+                                            <Activity className="w-6 h-6 text-zinc-400" />
+                                        </div>
+                                        <p className="text-zinc-900 dark:text-white font-bold mb-1">You haven't made any requests yet</p>
+                                        <p className="text-sm text-zinc-500 mb-6 max-w-sm">If someone near you needs blood, you can request help from here.</p>
                                         <Link href="/request/wizard">
-                                            <Button>
-                                                <Plus className="w-4 h-4 mr-2" />
-                                                New Blood Request
-                                            </Button>
+                                            <Button variant="outline" className="rounded-xl border-zinc-200 dark:border-zinc-800">Request help</Button>
                                         </Link>
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                                        {myRequests.map((req, i) => (
-                                            <motion.div
-                                                key={req.id}
-                                                initial={{ opacity: 0, y: 12 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                transition={{ delay: i * 0.07 }}
-                                            >
-                                                <Link href={`/request/${req.id}`} className="block h-full">
-                                                    <Card className="h-full border-gray-100 hover:border-brand-red/30 hover:shadow-lg transition-all overflow-hidden">
-                                                        <UrgencyBar level={req.urgency_level} />
-                                                        <CardContent className="p-5">
-                                                            <div className="flex items-center gap-3 mb-4">
-                                                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-white shadow-md ${URGENCY_COLOR[req.urgency_level] ?? "bg-gray-400"}`}>
-                                                                    {req.blood_group}
-                                                                </div>
-                                                                <div>
-                                                                    <h3 className="font-bold text-gray-900 line-clamp-1">{req.patient_name}</h3>
-                                                                    <p className="text-xs text-gray-500 truncate">{req.hospital_name}</p>
-                                                                </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {myRequests.map((req, i) => {
+                                            const statusStyle = STATUS_BADGE[req.status] ?? STATUS_BADGE["CREATED"];
+                                            const statusLabel = STATUS_LABEL[req.status] ?? "Unknown status";
+                                            
+                                            return (
+                                            <motion.div key={req.id} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }}>
+                                                <Link href={`/request/${req.id}`} className="block relative group outline-none">
+                                                    <div className="absolute inset-0 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200/50 dark:border-white/10 group-hover:border-crimson/30 transition-colors shadow-[0_8px_30px_rgb(0,0,0,0.04)] pointer-events-none" />
+                                                    <div className="relative p-6">
+                                                        
+                                                        <div className="flex items-start justify-between mb-4">
+                                                            <div className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border border-current/10 ${statusStyle.bg} ${statusStyle.text}`}>
+                                                                {statusLabel}
                                                             </div>
+                                                            <span className="text-[10px] font-mono text-zinc-400">
+                                                                {new Date(req.created_at).toLocaleDateString()}
+                                                            </span>
+                                                        </div>
 
-                                                            <div className="space-y-1.5 text-sm text-gray-600 mb-4">
-                                                                <div className="flex items-center gap-2">
-                                                                    <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                                                                    <span>{req.city}</span>
-                                                                </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                                                                    <span>{new Date(req.created_at).toLocaleDateString()}</span>
-                                                                </div>
+                                                        <div className="flex items-center gap-4 mb-4">
+                                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-sm tracking-tight border ${URGENCY_COLOR[req.urgency_level] ?? "bg-zinc-100 text-zinc-900 border-zinc-200"}`}>
+                                                                {req.blood_group}
                                                             </div>
+                                                            <div className="overflow-hidden">
+                                                                <h3 className="font-extrabold text-zinc-900 dark:text-white truncate tracking-tight">{req.patient_name}</h3>
+                                                                <p className="text-xs font-semibold text-zinc-500 truncate">{req.hospital_name}</p>
+                                                            </div>
+                                                        </div>
 
-                                                            <div className="flex items-center justify-between pt-3 border-t border-gray-50">
-                                                                <Badge variant={STATUS_BADGE[req.status] ?? "default"} className="text-[10px] uppercase tracking-wider">
-                                                                    {req.status.replace(/_/g, " ")}
-                                                                </Badge>
-                                                                {req.urgency_level === "IMMEDIATE" && (
-                                                                    <span className="text-xs font-bold text-red-600 flex items-center gap-1 animate-pulse">
-                                                                        <AlertCircle className="w-3 h-3" /> Urgent
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </CardContent>
-                                                    </Card>
+                                                    </div>
                                                 </Link>
                                             </motion.div>
-                                        ))}
+                                        )})}
                                     </div>
                                 )}
                             </motion.div>

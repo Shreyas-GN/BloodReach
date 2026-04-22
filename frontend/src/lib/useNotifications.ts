@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useApiClient } from "./useApiClient";
+import { supabaseClient } from "@/lib/supabase/client";
+import { useUser } from "@clerk/nextjs";
 import type { Notification } from "@/types";
 
 const POLL_INTERVAL_MS = 20_000;
@@ -16,38 +17,55 @@ interface UseNotificationsReturn {
 }
 
 export function useNotifications(): UseNotificationsReturn {
-    const api = useApiClient();
+    const { user } = useUser();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [loading, setLoading] = useState(true);
 
     const fetchAll = useCallback(async () => {
+        if (!user?.id) {
+            setLoading(false);
+            return;
+        }
         try {
-            const [notifRes, countRes] = await Promise.all([
-                api.get<Notification[]>("notifications/"),
-                api.get<{ unread_count: number }>("notifications/unread-count/"),
-            ]);
-            setNotifications(notifRes.data);
-            setUnreadCount(countRes.data.unread_count);
+            const { data, error } = await (supabaseClient as any)
+                .from('notifications')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(30);
+
+            if (!error && data) {
+                setNotifications(data as any);
+                setUnreadCount(data.filter((n: any) => !n.is_read).length);
+            }
         } catch {
             // Silently fail — polling will retry
         } finally {
             setLoading(false);
         }
-    }, [api]);
+    }, [user?.id]);
 
     const markAsRead = useCallback(
         async (id: number) => {
-            await api.post("notifications/mark-read/", { notification_ids: [id] });
+            await (supabaseClient as any)
+                .from('notifications')
+                .update({ is_read: true })
+                .eq('id', id);
             await fetchAll();
         },
-        [api, fetchAll]
+        [fetchAll]
     );
 
     const markAllAsRead = useCallback(async () => {
-        await api.post("notifications/mark-read/", { notification_ids: [] });
+        if (!user?.id) return;
+        await (supabaseClient as any)
+            .from('notifications')
+            .update({ is_read: true })
+            .eq('user_id', user.id)
+            .eq('is_read', false);
         await fetchAll();
-    }, [api, fetchAll]);
+    }, [user?.id, fetchAll]);
 
     useEffect(() => {
         fetchAll();

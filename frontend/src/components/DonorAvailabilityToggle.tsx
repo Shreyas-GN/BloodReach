@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from 'react';
-import { useApiClient } from '@/lib/useApiClient';
+import { useUser } from '@clerk/nextjs';
+import { DonorService } from '@/services/donor.service';
 
 interface DonorAvailabilityToggleProps {
     initialAvailable: boolean;
@@ -9,21 +10,22 @@ interface DonorAvailabilityToggleProps {
 }
 
 export function DonorAvailabilityToggle({ initialAvailable, onToggle }: DonorAvailabilityToggleProps) {
-    const api = useApiClient();
+    const { user } = useUser();
     const [isAvailable, setIsAvailable] = useState(initialAvailable);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const handleToggle = async () => {
+        if (!user) return;
         setLoading(true);
         setError(null);
 
         try {
-            const response = await api.post('users/toggle-availability/', {
-                is_available: !isAvailable
+            const newStatus = !isAvailable;
+            await DonorService.updateProfile(user.id, {
+                is_available_donor: newStatus
             });
 
-            const newStatus = response.data.is_available_donor;
             setIsAvailable(newStatus);
 
             if (onToggle) {
@@ -31,7 +33,7 @@ export function DonorAvailabilityToggle({ initialAvailable, onToggle }: DonorAva
             }
         } catch (err: any) {
             console.error('Error toggling availability:', err);
-            setError(err.response?.data?.error || 'Failed to update availability');
+            setError(err.message || 'Failed to update availability');
         } finally {
             setLoading(false);
         }
@@ -41,8 +43,8 @@ export function DonorAvailabilityToggle({ initialAvailable, onToggle }: DonorAva
         <div className="space-y-4">
             {/* Toggle Card */}
             <div className={`p-6 rounded-xl border-2 transition-all ${isAvailable
-                    ? 'bg-green-50 dark:bg-green-900/20 border-green-500'
-                    : 'bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
+                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-500'
+                    : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'
                 }`}>
                 <div className="flex items-center justify-between">
                     <div className="flex-1">
