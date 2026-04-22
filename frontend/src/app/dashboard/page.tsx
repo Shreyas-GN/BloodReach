@@ -26,17 +26,23 @@ const URGENCY_COLOR: Record<string, string> = {
 
 const STATUS_BADGE: Record<string, { bg: string, text: string }> = {
     CREATED: { bg: "bg-zinc-100 dark:bg-white/10", text: "text-zinc-600 dark:text-zinc-300" },
+    open: { bg: "bg-amber-500/10", text: "text-amber-700 dark:text-amber-400" },
     SEARCHING_FOR_DONORS: { bg: "bg-amber-500/10", text: "text-amber-700 dark:text-amber-400" },
     DONOR_ACCEPTED: { bg: "bg-emerald-500/10", text: "text-emerald-700 dark:text-emerald-400" },
+    fulfilled: { bg: "bg-emerald-500/10", text: "text-emerald-700 dark:text-emerald-400" },
     COMPLETED: { bg: "bg-zinc-100 dark:bg-white/10", text: "text-zinc-600 dark:text-zinc-400" },
+    cancelled: { bg: "bg-rose-500/10", text: "text-rose-700 dark:text-rose-400" },
     CANCELLED: { bg: "bg-rose-500/10", text: "text-rose-700 dark:text-rose-400" },
 };
 
 const STATUS_LABEL: Record<string, string> = {
     CREATED: "Created",
+    open: "Looking for donors",
     SEARCHING_FOR_DONORS: "Looking for donors",
     DONOR_ACCEPTED: "Donor found",
+    fulfilled: "Donor found",
     COMPLETED: "Completed",
+    cancelled: "Cancelled",
     CANCELLED: "Cancelled",
 };
 
@@ -104,7 +110,7 @@ export default function DashboardPage() {
         (r) =>
             r.requester_id !== (profile?.id ?? -1) &&
             r.blood_group === profile?.blood_group &&
-            (r.status === "SEARCHING_FOR_DONORS" || r.status === "CREATED")
+            (r.status === "SEARCHING_FOR_DONORS" || r.status === "CREATED" || r.status === "open")
     );
 
     const displayName = user?.firstName ?? user?.username ?? "There";
