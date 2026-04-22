@@ -50,19 +50,23 @@ export default function ProfilePage() {
     const [formData, setFormData] = useState({
         blood_group: '',
         city: '',
+        is_available_donor: false,
     });
+
+    const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState(false);
 
     useEffect(() => {
         const fetchProfile = async () => {
+            if (!user?.id) return;
             try {
-                const response = await api.get('users/profile/');
-                setProfile(response.data);
-                setFormData({
-                    blood_group: response.data.blood_group || '',
-                    city: response.data.city || '',
-                });
-            } catch (error) {
-                console.error('Failed to load profile', error);
+                const profileData = await DonorService.getProfile(user.id);
+                setProfile(profileData as UserProfile);
+                setFormData(profileData as any);
+            } catch (err: any) {
+                if (!err.message?.includes('No rows found')) {
+                    setError('Failed to load profile data');
+                }
             } finally {
                 setLoading(false);
             }
@@ -75,29 +79,37 @@ export default function ProfilePage() {
                 router.push('/');
             }
         }
-    }, [isLoaded, user, api, router]);
+    }, [isLoaded, user?.id, router]);
 
-    const handleSave = async () => {
+    const handleSave = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!user?.id) return;
         setSaving(true);
+        setError(null);
+        setSuccess(false);
+
         try {
-            const response = await api.post('users/profile/', formData);
-            setProfile(response.data);
+            const updated = await DonorService.updateProfile(user.id, formData);
+            setProfile(updated as UserProfile);
+            setSuccess(true);
             setIsEditing(false);
-        } catch (error) {
-            console.error('Failed to update profile', error);
-            alert('Failed to update profile. Please try again.');
+            setTimeout(() => setSuccess(false), 3000);
+        } catch (err: any) {
+            setError(err.message || 'Failed to update profile');
         } finally {
             setSaving(false);
         }
     };
 
     const toggleDonorStatus = async () => {
-        if (!profile) return;
+        if (!user?.id) return;
         try {
-            const response = await api.post('users/toggle-availability/');
-            setProfile(prev => prev ? ({ ...prev, is_available_donor: response.data.is_available_donor }) : null);
-        } catch (error) {
-            console.error('Failed to toggle status', error);
+            const newState = !formData.is_available_donor;
+            await DonorService.updateProfile(user.id, { is_available_donor: newState });
+            setFormData(prev => ({ ...prev, is_available_donor: newState }));
+            setProfile(prev => prev ? ({ ...prev, is_available_donor: newState }) : null);
+        } catch (err) {
+            alert('Failed to update availability');
         }
     };
 

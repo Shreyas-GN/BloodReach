@@ -1,18 +1,16 @@
 "use client";
 
 import { useState } from 'react';
-import { useApiClient } from '@/lib/useApiClient';
-import { useRouter } from 'next/navigation';
-import { Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { XCircle } from 'lucide-react';
+import { RequestService } from '@/services/request.service';
 
 interface CancelRequestButtonProps {
-    requestId: number;
+    requestId: number | string;
     onCancel?: () => void;
 }
 
 export function CancelRequestButton({ requestId, onCancel }: CancelRequestButtonProps) {
-    const api = useApiClient();
-    const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -20,23 +18,15 @@ export function CancelRequestButton({ requestId, onCancel }: CancelRequestButton
     const handleCancel = async () => {
         setLoading(true);
         setError(null);
-
         try {
-            await api.post(`requests/${requestId}/cancel/`);
-
+            await RequestService.updateRequest(requestId.toString(), { status: 'CANCELLED' });
+            
             if (onCancel) {
                 onCancel();
-            } else {
-                // Redirect to dashboard
-                router.push('/dashboard');
             }
         } catch (err: any) {
             console.error('Error cancelling request:', err);
-            setError(
-                err.response?.data?.error ||
-                err.response?.data?.message ||
-                'Failed to delete request'
-            );
+            setError(err.message || 'Failed to cancel request');
         } finally {
             setLoading(false);
             setShowConfirm(false);

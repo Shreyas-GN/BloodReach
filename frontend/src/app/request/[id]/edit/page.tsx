@@ -54,33 +54,41 @@ export default function EditRequestPage() {
     useEffect(() => {
         const fetchRequest = async () => {
             try {
-                const response = await api.get(`requests/${params.id}/`);
-                const request = response.data;
+                const response = await RequestService.getRequestById(params.id as string);
+                
+                // Security check
+                if (response.requester_id !== user?.id) {
+                    router.push('/dashboard');
+                    return;
+                }
 
-                // Populate form with existing data
+                setRequest(response as any);
                 setFormData({
-                    blood_group: request.blood_group || '',
-                    units: request.units || 1,
-                    patient_name: request.patient_name || '',
-                    hospital_name: request.hospital_name || '',
-                    city: request.city || '',
-                    contact_phone: request.contact_phone || '',
-                    requester_relation: request.requester_relation || 'MYSELF',
-                    urgency_level: request.urgency_level || 'IMMEDIATE',
-                    note: request.note || '',
+                    blood_group: response.blood_group,
+                    units: response.units,
+                    patient_name: response.patient_name || '',
+                    hospital_name: response.hospital_name,
+                    city: response.city || '',
+                    contact_phone: response.contact_phone || '',
+                    requester_relation: response.requester_relation || 'MYSELF',
+                    urgency_level: response.urgency_level || 'TODAY',
+                    note: response.note || ''
                 });
             } catch (err: any) {
-                console.error('Failed to fetch request:', err);
-                setError('Failed to load request details');
+                setError(err.message || 'Failed to load request');
             } finally {
                 setLoading(false);
             }
         };
 
-        if (params.id) {
-            fetchRequest();
+        if (isLoaded) {
+            if (user) {
+                fetchRequest();
+            } else {
+                router.push('/');
+            }
         }
-    }, [params.id, api]);
+    }, [isLoaded, user, params.id, router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -88,15 +96,9 @@ export default function EditRequestPage() {
         setError(null);
 
         try {
-            await api.patch(`requests/${params.id}/`, formData);
+            await RequestService.updateRequest(params.id as string, formData);
             router.push(`/request/${params.id}`);
         } catch (err: any) {
-            console.error('Update error:', err);
-
-            if (err.response?.data) {
-                const data = err.response.data;
-                if (data.message) {
-                    setError(data.message);
                 } else {
                     const errorMessages = Object.entries(data)
                         .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
