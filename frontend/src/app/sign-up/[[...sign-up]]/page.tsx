@@ -18,6 +18,7 @@ export default function SignUpPage() {
                 <SignUp
                     routing="path"
                     path="/sign-up"
+                    fallbackRedirectUrl="/onboarding"
                 />
             </div>
         </div>
