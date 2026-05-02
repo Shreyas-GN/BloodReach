@@ -1,7 +1,7 @@
-# PulseAid: Platform Specification & Design Identity
+# BloodReach: Platform Specification & Design Identity
 
 ## 1. Core Vision
-PulseAid is a **Human-Centric Emergency Blood Coordination Platform**. Unlike generic medical apps, PulseAid is designed as a "Command Center" for life-saving coordination. It prioritizes speed, psychological trust, and community impact through an intentional, editorial-style interface.
+BloodReach is a **Human-Centric Emergency Blood Coordination Platform**. Unlike generic medical apps, BloodReach is designed as a "Command Center" for life-saving coordination. It prioritizes speed, psychological trust, and community impact through an intentional, editorial-style interface.
 
 ---
 
@@ -35,14 +35,14 @@ The color scheme is designed to be high-contrast and authoritative, using a sing
   - `Amber (#d97706)`: Warnings and Non-Critical Urgency.
 
 ### ✍️ Typography Hierarchy
-PulseAid uses a "Cockpit" typography approach, mixing modern sans-serifs with technical monospaced fonts.
+BloodReach uses a "Cockpit" typography approach, mixing modern sans-serifs with technical monospaced fonts.
 - **Headings (Geist Sans)**: Bold, tight letter-spacing (`-0.05em`) for an editorial, premium look.
 - **Body Content (Geist Sans)**: Clean and readable with increased line height.
 - **Data & Technicals (Space Mono / Geist Mono)**: Used for Blood Groups, Units, Distances, and Timestamps to provide a "precise" and "technical" feel.
 - **Display Style**: Large lowercase headings for a modern, approachable brand voice.
 
 ### 🧊 Materiality: The "Clay" System
-Instead of flat design, PulseAid uses the **Clay** system for physical depth:
+Instead of flat design, BloodReach uses the **Clay** system for physical depth:
 - **Radii**: Extreme rounding (`24px` for cards, `40px` for sections) for a friendly, organic feel.
 - **Shadows**: Custom `shadow-clay` (soft, multi-layered) and `shadow-clay-hard` (sharp, brutalist offset for buttons).
 - **Gradients**: Subtle radial overlays on cards to simulate 3D volume.

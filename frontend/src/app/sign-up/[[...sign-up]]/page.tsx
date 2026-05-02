@@ -8,7 +8,7 @@ export default function SignUpPage() {
             <div className="w-full max-w-md">
                 <div className="text-center mb-8">
                     <h1 className="text-5xl font-extrabold text-brand-red tracking-tight mb-2">
-                        Pulse<span className="text-brand-blue">Aid</span>
+                        BloodReach
                     </h1>
                     <p className="text-lg text-brand-steel">
                         Join the life-saving community

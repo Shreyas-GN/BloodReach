@@ -193,7 +193,7 @@ export default function RequestDetailPage() {
             if (request?.contact_phone) {
                 await AlertService.sendSMS(
                     request.contact_phone, 
-                    `PULSE-AID ALERT: Good news! ${currentUserProfile.full_name || 'A donor'} has offered to donate blood for ${request.patient_name}. They may contact you shortly.`
+                    `BloodReach ALERT: Good news! ${currentUserProfile.full_name || 'A donor'} has offered to donate blood for ${request.patient_name}. They may contact you shortly.`
                 );
             }
             

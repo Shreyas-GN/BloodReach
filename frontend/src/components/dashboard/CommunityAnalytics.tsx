@@ -12,7 +12,7 @@ export function CommunityAnalytics() {
                 <h3 className="font-display font-bold text-[1.125rem] tracking-tight">Community Analytics</h3>
                 <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-zinc-800 border border-zinc-700 text-[10px] font-mono uppercase tracking-widest text-zinc-300">
                     <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-blood)] animate-pulse" />
-                    Network Pulse
+                    Network Activity
                 </span>
             </div>
 

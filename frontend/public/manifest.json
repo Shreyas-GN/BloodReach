@@ -1,6 +1,6 @@
 {
-  "name": "Pulse-Aid",
-  "short_name": "Pulse-Aid",
+  "name": "BloodReach",
+  "short_name": "BloodReach",
   "description": "Real-time emergency blood donation platform",
   "start_url": "/",
   "display": "standalone",

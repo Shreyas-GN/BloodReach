@@ -1,68 +1,86 @@
-# 🩸 PulseAid
-### **The AI-Powered Emergency Blood Command Center**
+# 🩸 BloodReach
 
-![PulseAid Landing Page](./frontend/public/hero-screenshot.png)
+### **Real-time emergency blood coordination, built for precision when every second counts.**
 
-PulseAid is a project I built to solve a problem that hits home for many: the chaotic, frantic search for blood donors during medical emergencies. 
-
-Instead of relying on scattered WhatsApp forwards and hoping for a miracle, PulseAid is a high-speed, direct coordination platform that connects families with compatible donors in their immediate vicinity. No noise, no spam—just action when every second counts.
+BloodReach is a high-trust, minimalist platform designed to bridge the gap between medical emergencies and life-saving donors. Built with a focus on reducing cognitive load and prioritizing action over engagement, it transforms the chaotic search for blood into a structured, immediate coordination system.
 
 ---
 
-## 🧠 Why this is different (The AI Edge)
-Most platforms fail because they force users to fill out long, tedious forms during a crisis. **I solved this using AI.**
+## 🏛️ Design Philosophy
 
-One of the core features I implemented is a **Natural Language Emergency Parser**. Powered by **Groq and Llama-3**, it allows a frantic family member to simply type:
-> *"Urgent! Need 3 units of B+ at Manipal Hospital for surgery, please help!"*
+In an emergency, users are often under extreme stress and unable to think clearly. BloodReach adheres to a strict **Minimalist Healthcare Design System**:
 
-The AI instantly extracts the blood group, urgency level, units, and hospital name, auto-filling the entire request flow. It turns panic into structured data in milliseconds.
-
----
-
-## ⚡ Key Features
-- **AI-Driven Entry**: Skip the forms. Type naturally, let the AI handle the data extraction.
-- **Precision Alerts**: Donors are only notified if their blood type matches and they are within a 20km radius. 
-- **The "Cockpit" Dashboard**: A premium, editorial-style command center that tracks network pulse and emergency requests without the clutter.
-- **Availability Toggle**: A "No-BS" way for donors to go invisible when they can't help, preventing unnecessary pings.
-- **Privacy First**: Direct phone connection for matched donors—no middlemen, no complex chat interfaces.
+- **Reduced Cognitive Load**: No "startup flashy" visuals, loud gradients, or complex dashboard clutter.
+- **Calm, Neutral Palette**: A professional environment using deep reds for critical actions and neutral tones for structure.
+- **Editorial Clarity**: High-contrast typography (Geist/Inter) and generous whitespace to ensure information is scannable in seconds.
+- **Trust-First Architecture**: Built to feel like a stable healthcare utility, not a social media tool.
 
 ---
 
-## 🛠️ The Tech Stack
-I chose a modern, high-performance stack to ensure the app is both beautiful and bulletproof:
-- **Frontend**: Next.js 15 (App Router) + Tailwind CSS + Framer Motion.
-- **AI Engine**: Groq SDK + Llama-3-70b (for sub-200ms parsing).
-- **Backend**: Supabase (PostgreSQL + Realtime) & Django.
-- **Auth**: Clerk (Secure, modern identity management).
+## 🧠 The AI Engine
+
+One of the platform's core breakthroughs is the **Natural Language Emergency Parser**. Powered by **Llama-3 (Groq)**, it allows users to bypass tedious forms during a crisis.
+
+Family members can simply describe the situation in plain text:
+> *"Help! Need 2 units of O-negative at Apollo Hospital Jubilee Hills for a surgery scheduled in 1 hour."*
+
+The AI instantly extracts:
+- **Blood Group**: `O-`
+- **Urgency**: `IMMEDIATE`
+- **Location**: `Apollo Hospital, Jubilee Hills`
+- **Units**: `2`
+
+This turns raw panic into actionable, structured data in under 200ms.
 
 ---
 
-## 🚀 Running it locally
+## ⚡ Core Features
 
-### 1. The Frontend (Next.js)
+- **AI-Powered Rapid Entry**: Natural language processing to eliminate form friction.
+- **Precision Geo-Alerting**: Donors are only notified if they match the blood type and are within the immediate 20km radius.
+- **Live Activity Feed**: A real-time timeline of requests and responses to maintain network momentum.
+- **Donor Integrity Control**: A "One-Click" availability toggle and a medical-grade recovery cooldown system.
+- **Privacy-First Connection**: Direct coordination without intermediaries, ensuring speed and data sovereignty.
+
+---
+
+## 🛠️ The Stack
+
+- **Frontend**: Next.js 15 (App Router) + Tailwind CSS.
+- **Styling**: Custom Variable-based Design System (Minimalist Healthcare).
+- **AI**: Groq SDK + Llama-3-70b.
+- **Data & Realtime**: Supabase (PostgreSQL + Realtime Hooks).
+- **Auth**: Clerk (Secure Identity Management).
+
+---
+
+## 🚀 Development Setup
+
+### 1. Frontend Setup
 ```bash
 cd frontend
 npm install
-# Add your GROQ_API_KEY and CLERK keys to .env.local
+# Configure your .env.local with Clerk, Supabase, and Groq keys
 npm run dev
 ```
 
-### 2. The Backend (Django)
+### 2. Backend (Optional/Legacy)
+The platform is currently migrating to a Next.js Serverless architecture, but the legacy Django service can be run via:
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # or venv\Scripts\activate on Windows
+source venv/bin/activate
 pip install -r requirements.txt
-python manage.py migrate
 python manage.py runserver
 ```
 
 ---
 
-## 📍 Road Ahead
-- **Automated SMS/WhatsApp Alerts**: Moving beyond app notifications for 100% reach.
-- **Geospatial Routing**: Showing donors the exact travel time to the hospital.
-- **Smart Cooldown**: Automatic donor "invisible" status after a successful donation.
+## ⚖️ Medical Disclaimer
+**BloodReach is a coordination platform and does not provide medical services.** 
+The platform is intended to connect donors and seekers; all medical procedures, blood testing, and transfusions must be performed by certified medical professionals in clinical settings.
+
+---
 
 ## License
-MIT. Built with heart in Bangalore. 🩸
+MIT. Built with heart and intentionality for the global health community. 🩸

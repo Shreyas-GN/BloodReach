@@ -1,4 +1,4 @@
--- 🩸 PulseAid V2 Database Migration
+-- 🩸 BloodReach V2 Database Migration
 
 -- 1. Update Profiles Table
 ALTER TABLE public.profiles

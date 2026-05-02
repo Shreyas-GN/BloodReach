@@ -156,7 +156,7 @@ export function RequestDetailDrawer({ requestId, onClose, onActionComplete }: Pr
             if (request?.contact_phone) {
                 await AlertService.sendSMS(
                     request.contact_phone,
-                    `PULSE-AID ALERT: ${currentUserProfile.full_name || "A donor"} has offered to donate blood for ${request.patient_name}. They may contact you shortly.`
+                    `BloodReach ALERT: ${currentUserProfile.full_name || "A donor"} has offered to donate blood for ${request.patient_name}. They may contact you shortly.`
                 );
             }
             await fetchRequest();

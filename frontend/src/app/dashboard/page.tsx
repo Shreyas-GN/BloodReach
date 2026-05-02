@@ -119,7 +119,7 @@ export default function DashboardPage() {
             if (req?.contact_phone) {
                 await AlertService.sendSMS(
                     req.contact_phone,
-                    `PULSE-AID ALERT: Good news! ${profile?.full_name || 'A donor'} has offered to donate blood for ${req.patient_name || 'your request'}. They may contact you shortly. Please check your dashboard for details.`
+                    `BloodReach ALERT: Good news! ${profile?.full_name || 'A donor'} has offered to donate blood for ${req.patient_name || 'your request'}. They may contact you shortly. Please check your dashboard for details.`
                 );
             }
 
@@ -220,7 +220,7 @@ export default function DashboardPage() {
                         </div>
                     )}
 
-                    {/* ROW 1: Identity Panel (4 cols) + Live Pulse Feed (8 cols) */}
+                    {/* ROW 1: Identity Panel (4 cols) + Live Feed Feed (8 cols) */}
                     
                     {/* User Profile Card */}
                     <div className="lg:col-[1/5] lg:row-start-1 bg-white rounded-[var(--radius-card)] shadow-[var(--shadow-clay)] p-6 min-h-[200px] flex flex-col justify-between">
@@ -248,7 +248,7 @@ export default function DashboardPage() {
                         </Link>
                     </div>
 
-                    {/* Live Pulse Card */}
+                    {/* Live Feed Card */}
                     <div className="lg:col-[5/13] lg:row-start-1">
                         <ActivityTimeline />
                     </div>

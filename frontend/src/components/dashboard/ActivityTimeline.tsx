@@ -55,7 +55,7 @@ export function ActivityTimeline() {
     return (
         <div className="bg-white rounded-[var(--radius-card)] shadow-[var(--shadow-clay)] flex flex-col h-[360px] overflow-hidden relative">
             <div className="flex items-center justify-between p-[24px] pb-[16px] sticky top-0 bg-white z-10 border-b border-[var(--color-base-200)]">
-                <h3 className="font-display font-bold text-[0.9375rem] text-[var(--color-base-900)]">Live Pulse</h3>
+                <h3 className="font-display font-bold text-[0.9375rem] text-[var(--color-base-900)]">Live Feed</h3>
                 <div className="bg-[var(--color-safe-light)] text-[var(--color-safe)] font-mono text-[0.625rem] rounded-[var(--radius-pill)] px-[10px] py-[4px] font-bold flex items-center gap-1.5 uppercase tracking-widest">
                     <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-safe)] animate-pulse" />
                     LIVE
