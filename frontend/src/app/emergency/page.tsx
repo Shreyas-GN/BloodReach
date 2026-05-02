@@ -320,7 +320,7 @@ export default function EmergencyPage() {
                                         </div>
                                     </div>
                                     <button
-                                        onClick={() => setStep('verify')}
+                                        onClick={() => setStep('otp')}
                                         disabled={!parsed?.hospital_name || !parsed?.blood_group}
                                         className="w-full py-4 bg-crimson text-white rounded-2xl font-black text-sm tracking-tight hover:bg-red-700 transition-all shadow-xl flex items-center justify-center gap-2 active:scale-[0.98]"
                                     >
