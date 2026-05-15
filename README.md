@@ -2,7 +2,7 @@
 
 BloodReach is an advanced emergency blood coordination platform designed to instantly connect hospitals, patients, and donors. Built with a modern, microservice-based architecture, it features real-time geospatial tracking, automated multi-tiered notification escalation, and secure API infrastructure.
 
-![BloodReach Architecture Overview](./pulse_aid_architecture_and_deployment.md) *(Note: Refer to the Architecture markdown for full diagrams)*
+![BloodReach Architecture Overview](./bloodreach_architecture.md) *(Note: Refer to the Architecture markdown for full diagrams)*
 
 ---
 
